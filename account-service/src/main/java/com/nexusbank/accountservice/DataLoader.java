@@ -24,6 +24,9 @@ public class DataLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        if (accountRepository.count() > 0) {
+            return;
+        }
 
         // Account 1 - Checking
         Account account1 = new Account();

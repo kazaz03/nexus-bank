@@ -3,6 +3,7 @@ package com.nexusbank.userservice;
 import com.nexusbank.userservice.model.*;
 import com.nexusbank.userservice.repository.*;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,26 +16,32 @@ public class DataLoader implements CommandLineRunner {
     private final TellerRepository tellerRepository;
     private final LoanOfficerRepository loanOfficerRepository;
     private final AdminRepository adminRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public DataLoader(UserRepository userRepository,
                       CustomerRepository customerRepository,
                       TellerRepository tellerRepository,
                       LoanOfficerRepository loanOfficerRepository,
-                      AdminRepository adminRepository) {
+                      AdminRepository adminRepository,
+                      PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.customerRepository = customerRepository;
         this.tellerRepository = tellerRepository;
         this.loanOfficerRepository = loanOfficerRepository;
         this.adminRepository = adminRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     public void run(String... args) throws Exception {
+        if (userRepository.count() > 0) {
+            return;
+        }
 
         // User 1 - Customer
         User user1 = new User();
         user1.setEmail("marko.nikolic@nexusbank.com");
-        user1.setPasswordHash("hashed_password_1");
+        user1.setPasswordHash(passwordEncoder.encode("password1"));
         user1.setFirstName("Marko");
         user1.setLastName("Nikolić");
         user1.setRole(User.Role.CUSTOMER);
@@ -55,7 +62,7 @@ public class DataLoader implements CommandLineRunner {
         // User 2 - Teller
         User user2 = new User();
         user2.setEmail("ana.kovacevic@nexusbank.com");
-        user2.setPasswordHash("hashed_password_2");
+        user2.setPasswordHash(passwordEncoder.encode("password2"));
         user2.setFirstName("Ana");
         user2.setLastName("Kovačević");
         user2.setRole(User.Role.TELLER);
@@ -71,7 +78,7 @@ public class DataLoader implements CommandLineRunner {
         // User 3 - Loan Officer
         User user3 = new User();
         user3.setEmail("edin.hasanovic@nexusbank.com");
-        user3.setPasswordHash("hashed_password_3");
+        user3.setPasswordHash(passwordEncoder.encode("password3"));
         user3.setFirstName("Edin");
         user3.setLastName("Hasanović");
         user3.setRole(User.Role.LOAN_OFFICER);
@@ -87,7 +94,7 @@ public class DataLoader implements CommandLineRunner {
         // User 4 - Admin
         User user4 = new User();
         user4.setEmail("admin@nexusbank.com");
-        user4.setPasswordHash("hashed_password_4");
+        user4.setPasswordHash(passwordEncoder.encode("admin123"));
         user4.setFirstName("System");
         user4.setLastName("Admin");
         user4.setRole(User.Role.ADMIN);
