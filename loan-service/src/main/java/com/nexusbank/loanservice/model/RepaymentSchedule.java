@@ -20,7 +20,7 @@ public class RepaymentSchedule {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "loan_application_id", nullable = false)
     private LoanApplication loanApplication;
 
