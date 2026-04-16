@@ -5,6 +5,7 @@ import com.nexusbank.userservice.dto.request.RegisterCustomerRequest;
 import com.nexusbank.userservice.dto.request.UpdateCustomerRequest;
 import com.nexusbank.userservice.dto.response.CustomerResponse;
 import com.nexusbank.userservice.exception.EmailAlreadyExistsException;
+import com.nexusbank.userservice.config.SecurityConfig;
 import com.nexusbank.userservice.exception.GlobalExceptionHandler;
 import com.nexusbank.userservice.exception.ResourceNotFoundException;
 import com.nexusbank.userservice.security.JwtAuthFilter;
@@ -24,13 +25,16 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import jakarta.servlet.FilterChain;
+
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(CustomerController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, SecurityConfig.class})
 class CustomerControllerTest {
 
     @Autowired
@@ -51,7 +55,12 @@ class CustomerControllerTest {
     private CustomerResponse sampleResponse;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        doAnswer(inv -> {
+            ((FilterChain) inv.getArgument(2)).doFilter(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(jwtAuthFilter).doFilter(any(), any(), any());
+
         sampleResponse = new CustomerResponse();
         sampleResponse.setId(10L);
         sampleResponse.setUserId(1L);
