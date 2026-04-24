@@ -41,7 +41,7 @@ public class Transaction {
     @Column(name = "reference")
     private String reference;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "exchange_rate_id")
     private ExchangeRate exchangeRate;
 
