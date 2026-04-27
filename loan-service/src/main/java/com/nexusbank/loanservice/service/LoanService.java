@@ -1,6 +1,13 @@
 package com.nexusbank.loanservice.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.fge.jsonpatch.JsonPatch;
+import com.github.fge.jsonpatch.JsonPatchException;
+import com.nexusbank.loanservice.client.AccountProbeClient;
 import com.nexusbank.loanservice.dto.request.LoanApplicationRequest;
+import com.nexusbank.loanservice.dto.request.LoanApplicationPatchRequest;
 import com.nexusbank.loanservice.dto.request.LoanReviewRequest;
 import com.nexusbank.loanservice.dto.response.LoanApplicationResponse;
 import com.nexusbank.loanservice.dto.response.RepaymentScheduleResponse;
@@ -10,6 +17,10 @@ import com.nexusbank.loanservice.model.RepaymentSchedule;
 import com.nexusbank.loanservice.repository.LoanApplicationRepository;
 import com.nexusbank.loanservice.repository.RepaymentScheduleRepository;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +30,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class LoanService {
@@ -26,29 +38,43 @@ public class LoanService {
     private final LoanApplicationRepository loanApplicationRepository;
     private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final ModelMapper modelMapper;
+    private final ObjectMapper objectMapper;
+    private final AccountProbeClient accountProbeClient;
 
     public LoanService(LoanApplicationRepository loanApplicationRepository,
                        RepaymentScheduleRepository repaymentScheduleRepository,
-                       ModelMapper modelMapper) {
+                       ModelMapper modelMapper,
+                       ObjectMapper objectMapper,
+                       AccountProbeClient accountProbeClient) {
         this.loanApplicationRepository = loanApplicationRepository;
         this.repaymentScheduleRepository = repaymentScheduleRepository;
         this.modelMapper = modelMapper;
+        this.objectMapper = objectMapper;
+        this.accountProbeClient = accountProbeClient;
     }
 
     @Transactional
     public LoanApplicationResponse submitApplication(LoanApplicationRequest request) {
-        LoanApplication application = new LoanApplication();
-        application.setCustomerId(request.getCustomerId());
-        application.setAccountId(request.getAccountId());
-        application.setAmountRequested(request.getAmountRequested());
-        application.setCurrency(request.getCurrency() != null ? request.getCurrency() : "BAM");
-        application.setTermMonths(request.getTermMonths());
-        application.setPurpose(request.getPurpose());
-        application.setStatus(LoanApplication.LoanStatus.PENDING);
-        application.setCreatedAt(LocalDateTime.now());
+        LoanApplication application = createPendingApplication(request);
 
         loanApplicationRepository.save(application);
         return toResponse(application);
+    }
+
+    @Transactional
+    public List<LoanApplicationResponse> submitApplicationsBatch(List<LoanApplicationRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new IllegalArgumentException("Batch request must contain at least one application");
+        }
+
+        List<LoanApplication> applications = requests.stream()
+                .map(this::createPendingApplication)
+                .toList();
+
+        loanApplicationRepository.saveAll(applications);
+        return applications.stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     public LoanApplicationResponse getApplication(Long id) {
@@ -61,10 +87,64 @@ public class LoanService {
                 .toList();
     }
 
-    public List<LoanApplicationResponse> getAllApplications() {
-        return loanApplicationRepository.findAll().stream()
-                .map(this::toResponse)
-                .toList();
+    public Page<LoanApplicationResponse> getAllApplications(
+            int page,
+            int size,
+            String sortBy,
+            String sortDirection,
+            Long customerId,
+            String status,
+            BigDecimal minAmount,
+            BigDecimal maxAmount) {
+        if (size < 1 || size > 100) {
+            throw new IllegalArgumentException("Page size must be between 1 and 100");
+        }
+        if (page < 0) {
+            throw new IllegalArgumentException("Page index must not be negative");
+        }
+        if (minAmount != null && maxAmount != null && minAmount.compareTo(maxAmount) > 0) {
+            throw new IllegalArgumentException("minAmount cannot be greater than maxAmount");
+        }
+
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection)
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+        LoanApplication.LoanStatus parsedStatus = parseStatus(status);
+
+        return loanApplicationRepository.searchApplications(customerId, parsedStatus, minAmount, maxAmount, pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional
+    public LoanApplicationResponse patchApplication(Long id, JsonPatch patch) {
+        LoanApplication application = findById(id);
+        if (application.getStatus() != LoanApplication.LoanStatus.PENDING) {
+            throw new IllegalStateException("Only PENDING applications can be patched");
+        }
+
+        LoanApplicationPatchRequest currentState = new LoanApplicationPatchRequest();
+        currentState.setAmountRequested(application.getAmountRequested());
+        currentState.setCurrency(application.getCurrency());
+        currentState.setTermMonths(application.getTermMonths());
+        currentState.setPurpose(application.getPurpose());
+
+        LoanApplicationPatchRequest patchedState;
+        try {
+            JsonNode patchedNode = patch.apply(objectMapper.convertValue(currentState, JsonNode.class));
+            patchedState = objectMapper.treeToValue(patchedNode, LoanApplicationPatchRequest.class);
+        } catch (JsonPatchException | JsonProcessingException ex) {
+            throw new IllegalArgumentException("Invalid JSON Patch document", ex);
+        }
+        validatePatchedState(patchedState);
+
+        application.setAmountRequested(patchedState.getAmountRequested());
+        application.setCurrency(patchedState.getCurrency().trim().toUpperCase());
+        application.setTermMonths(patchedState.getTermMonths());
+        application.setPurpose(patchedState.getPurpose().trim());
+
+        loanApplicationRepository.save(application);
+        return toResponse(application);
     }
 
     @Transactional
@@ -101,6 +181,50 @@ public class LoanService {
         return repaymentScheduleRepository.findByLoanApplicationId(loanId).stream()
                 .map(this::toScheduleResponse)
                 .toList();
+    }
+
+    public Map<String, Object> probeAccountServiceInstance(String mode, String directBaseUrl) {
+        return accountProbeClient.probe(mode, directBaseUrl);
+    }
+
+    private LoanApplication createPendingApplication(LoanApplicationRequest request) {
+        LoanApplication application = new LoanApplication();
+        application.setCustomerId(request.getCustomerId());
+        application.setAccountId(request.getAccountId());
+        application.setAmountRequested(request.getAmountRequested());
+        application.setCurrency(request.getCurrency() != null ? request.getCurrency().trim().toUpperCase() : "BAM");
+        application.setTermMonths(request.getTermMonths());
+        application.setPurpose(request.getPurpose());
+        application.setStatus(LoanApplication.LoanStatus.PENDING);
+        application.setCreatedAt(LocalDateTime.now());
+        return application;
+    }
+
+    private LoanApplication.LoanStatus parseStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+
+        try {
+            return LoanApplication.LoanStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid status value: " + status);
+        }
+    }
+
+    private void validatePatchedState(LoanApplicationPatchRequest request) {
+        if (request.getAmountRequested() == null || request.getAmountRequested().compareTo(new BigDecimal("100.00")) < 0) {
+            throw new IllegalArgumentException("Loan amount must be at least 100");
+        }
+        if (request.getTermMonths() == null || request.getTermMonths() < 1) {
+            throw new IllegalArgumentException("Term must be at least 1 month");
+        }
+        if (request.getPurpose() == null || request.getPurpose().isBlank()) {
+            throw new IllegalArgumentException("Purpose must not be blank");
+        }
+        if (request.getCurrency() == null || request.getCurrency().isBlank() || request.getCurrency().trim().length() != 3) {
+            throw new IllegalArgumentException("Currency must be a 3-letter code");
+        }
     }
 
     private void generateRepaymentSchedule(LoanApplication loan) {
