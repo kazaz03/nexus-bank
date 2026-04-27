@@ -1,7 +1,12 @@
 package com.nexusbank.loanservice.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.fge.jsonpatch.JsonPatch;
+import com.nexusbank.loanservice.client.AccountProbeClient;
 import com.nexusbank.loanservice.dto.request.LoanApplicationRequest;
 import com.nexusbank.loanservice.dto.request.LoanReviewRequest;
+import com.nexusbank.loanservice.dto.request.LoanApplicationPatchRequest;
 import com.nexusbank.loanservice.dto.response.LoanApplicationResponse;
 import com.nexusbank.loanservice.dto.response.RepaymentScheduleResponse;
 import com.nexusbank.loanservice.exception.ResourceNotFoundException;
@@ -16,17 +21,22 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,6 +50,12 @@ class LoanServiceTest {
 
     @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private ObjectMapper objectMapper;
+
+    @Mock
+    private AccountProbeClient accountProbeClient;
 
     @InjectMocks
     private LoanService loanService;
@@ -89,6 +105,39 @@ class LoanServiceTest {
                 l.getStatus() == LoanApplication.LoanStatus.PENDING));
     }
 
+    @Test
+    void submitApplicationsBatch_savesAllApplications() {
+        LoanApplicationRequest requestOne = new LoanApplicationRequest();
+        requestOne.setCustomerId(10L);
+        requestOne.setAccountId(20L);
+        requestOne.setAmountRequested(BigDecimal.valueOf(5000));
+        requestOne.setCurrency("BAM");
+        requestOne.setTermMonths(12);
+        requestOne.setPurpose("Home renovation");
+
+        LoanApplicationRequest requestTwo = new LoanApplicationRequest();
+        requestTwo.setCustomerId(11L);
+        requestTwo.setAccountId(21L);
+        requestTwo.setAmountRequested(BigDecimal.valueOf(3000));
+        requestTwo.setCurrency("BAM");
+        requestTwo.setTermMonths(6);
+        requestTwo.setPurpose("Car service");
+
+        when(loanApplicationRepository.saveAll(any())).thenReturn(List.of(pendingLoan));
+        when(modelMapper.map(any(LoanApplication.class), eq(LoanApplicationResponse.class))).thenReturn(loanResponse);
+
+        List<LoanApplicationResponse> result = loanService.submitApplicationsBatch(List.of(requestOne, requestTwo));
+
+        assertThat(result).hasSize(2);
+        verify(loanApplicationRepository).saveAll(argThat(list -> ((List<?>) list).size() == 2));
+    }
+
+    @Test
+    void submitApplicationsBatch_withEmptyInput_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () -> loanService.submitApplicationsBatch(List.of()));
+        verify(loanApplicationRepository, never()).saveAll(any());
+    }
+
     // ── getApplication ────────────────────────────────────────────────────────
 
     @Test
@@ -112,12 +161,34 @@ class LoanServiceTest {
 
     @Test
     void getAllApplications_returnsList() {
-        when(loanApplicationRepository.findAll()).thenReturn(List.of(pendingLoan));
+        Page<LoanApplication> page = new PageImpl<>(List.of(pendingLoan));
+        when(loanApplicationRepository.searchApplications(isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+                .thenReturn(page);
         when(modelMapper.map(pendingLoan, LoanApplicationResponse.class)).thenReturn(loanResponse);
 
-        List<LoanApplicationResponse> result = loanService.getAllApplications();
+        Page<LoanApplicationResponse> result = loanService.getAllApplications(
+                0,
+                20,
+                "createdAt",
+                "desc",
+                null,
+                null,
+                null,
+                null);
 
-        assertThat(result).hasSize(1);
+        assertThat(result.getContent()).hasSize(1);
+    }
+
+    @Test
+    void getAllApplications_withInvalidPageSize_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> loanService.getAllApplications(0, 0, "createdAt", "desc", null, null, null, null));
+    }
+
+    @Test
+    void getAllApplications_withInvalidStatus_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> loanService.getAllApplications(0, 20, "createdAt", "desc", null, "UNKNOWN", null, null));
     }
 
     // ── getApplicationsByCustomer ─────────────────────────────────────────────
@@ -130,6 +201,56 @@ class LoanServiceTest {
         List<LoanApplicationResponse> result = loanService.getApplicationsByCustomer(10L);
 
         assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void patchApplication_whenPendingAndPatchValid_updatesFields() throws Exception {
+        JsonPatch patch = mock(JsonPatch.class);
+        JsonNode currentNode = mock(JsonNode.class);
+        JsonNode patchedNode = mock(JsonNode.class);
+
+        LoanApplicationPatchRequest patchedRequest = new LoanApplicationPatchRequest();
+        patchedRequest.setAmountRequested(BigDecimal.valueOf(9000));
+        patchedRequest.setCurrency("eur");
+        patchedRequest.setTermMonths(24);
+        patchedRequest.setPurpose("Education");
+
+        when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(pendingLoan));
+        when(objectMapper.convertValue(any(LoanApplicationPatchRequest.class), eq(JsonNode.class))).thenReturn(currentNode);
+        when(patch.apply(currentNode)).thenReturn(patchedNode);
+        when(objectMapper.treeToValue(patchedNode, LoanApplicationPatchRequest.class)).thenReturn(patchedRequest);
+        when(loanApplicationRepository.save(any())).thenReturn(pendingLoan);
+        when(modelMapper.map(any(LoanApplication.class), eq(LoanApplicationResponse.class))).thenReturn(loanResponse);
+
+        LoanApplicationResponse result = loanService.patchApplication(1L, patch);
+
+        assertThat(result).isNotNull();
+        verify(loanApplicationRepository).save(argThat(loan ->
+                loan.getAmountRequested().compareTo(BigDecimal.valueOf(9000)) == 0
+                        && loan.getTermMonths() == 24
+                        && "EUR".equals(loan.getCurrency())
+                        && "Education".equals(loan.getPurpose())));
+    }
+
+    @Test
+    void patchApplication_whenStatusNotPending_throwsIllegalStateException() {
+        JsonPatch patch = mock(JsonPatch.class);
+        pendingLoan.setStatus(LoanApplication.LoanStatus.APPROVED);
+        when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(pendingLoan));
+
+        assertThrows(IllegalStateException.class, () -> loanService.patchApplication(1L, patch));
+    }
+
+    @Test
+    void patchApplication_whenPatchInvalid_throwsIllegalArgumentException() throws Exception {
+        JsonPatch patch = mock(JsonPatch.class);
+        JsonNode currentNode = mock(JsonNode.class);
+
+        when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(pendingLoan));
+        when(objectMapper.convertValue(any(LoanApplicationPatchRequest.class), eq(JsonNode.class))).thenReturn(currentNode);
+        when(patch.apply(currentNode)).thenThrow(new com.github.fge.jsonpatch.JsonPatchException("patch error"));
+
+        assertThrows(IllegalArgumentException.class, () -> loanService.patchApplication(1L, patch));
     }
 
     // ── reviewApplication – approval ─────────────────────────────────────────
@@ -240,5 +361,15 @@ class LoanServiceTest {
         when(loanApplicationRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> loanService.getRepaymentSchedule(99L));
+    }
+
+    @Test
+    void probeAccountServiceInstance_delegatesToClient() {
+        when(accountProbeClient.probe("lb", null)).thenReturn(Map.of("mode", "lb"));
+
+        Map<String, Object> result = loanService.probeAccountServiceInstance("lb", null);
+
+        assertThat(result).containsEntry("mode", "lb");
+        verify(accountProbeClient).probe("lb", null);
     }
 }

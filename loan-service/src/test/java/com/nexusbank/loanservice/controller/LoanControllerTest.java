@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -119,15 +120,61 @@ class LoanControllerTest {
                 .andExpect(jsonPath("$.fieldErrors.purpose").exists());
     }
 
+    @Test
+    void submitApplicationsBatch_withValidRequest_returns201() throws Exception {
+        LoanApplicationRequest first = buildRequest(10L, 20L, BigDecimal.valueOf(5000), 12, "Purpose A");
+        LoanApplicationRequest second = buildRequest(11L, 21L, BigDecimal.valueOf(6000), 18, "Purpose B");
+
+        LoanApplicationResponse secondResponse = new LoanApplicationResponse();
+        secondResponse.setId(2L);
+        secondResponse.setStatus("PENDING");
+
+        when(loanService.submitApplicationsBatch(any())).thenReturn(List.of(sampleResponse, secondResponse));
+
+        mockMvc.perform(post("/api/loans/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(first, second))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[1].id").value(2));
+    }
+
+    @Test
+    void submitApplicationsBatch_withEmptyList_returns400() throws Exception {
+        when(loanService.submitApplicationsBatch(any()))
+                .thenThrow(new IllegalArgumentException("Batch request must contain at least one application"));
+
+        mockMvc.perform(post("/api/loans/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[]"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Batch request must contain at least one application"));
+    }
+
     // ── GET /api/loans ────────────────────────────────────────────────────────
 
     @Test
     void getAllApplications_returns200WithList() throws Exception {
-        when(loanService.getAllApplications()).thenReturn(List.of(sampleResponse));
+        when(loanService.getAllApplications(0, 20, "createdAt", "desc", null, null, null, null))
+                .thenReturn(new PageImpl<>(List.of(sampleResponse)));
 
         mockMvc.perform(get("/api/loans"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].status").value("PENDING"));
+                .andExpect(jsonPath("$.content[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void getAllApplications_withInvalidAmountRange_returns400() throws Exception {
+        when(loanService.getAllApplications(0, 20, "createdAt", "desc", null, null,
+                BigDecimal.valueOf(1000), BigDecimal.valueOf(100)))
+                .thenThrow(new IllegalArgumentException("minAmount cannot be greater than maxAmount"));
+
+        mockMvc.perform(get("/api/loans")
+                        .param("minAmount", "1000")
+                        .param("maxAmount", "100"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("minAmount cannot be greater than maxAmount"));
     }
 
     // ── GET /api/loans/{id} ───────────────────────────────────────────────────
@@ -151,6 +198,38 @@ class LoanControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Loan application not found: 99"))
                 .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void patchApplication_withValidJsonPatch_returns200() throws Exception {
+        LoanApplicationResponse patched = new LoanApplicationResponse();
+        patched.setId(1L);
+        patched.setPurpose("Education loan");
+        patched.setStatus("PENDING");
+
+        when(loanService.patchApplication(eq(1L), any())).thenReturn(patched);
+
+        String patchBody = "[{\"op\":\"replace\",\"path\":\"/purpose\",\"value\":\"Education loan\"}]";
+
+        mockMvc.perform(patch("/api/loans/1")
+                        .contentType("application/json-patch+json")
+                        .content(patchBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.purpose").value("Education loan"));
+    }
+
+    @Test
+    void patchApplication_withInvalidPatch_returns400() throws Exception {
+        when(loanService.patchApplication(eq(1L), any()))
+                .thenThrow(new IllegalArgumentException("Invalid JSON Patch document"));
+
+        String patchBody = "[{\"op\":\"replace\",\"path\":\"/unknown\",\"value\":\"x\"}]";
+
+        mockMvc.perform(patch("/api/loans/1")
+                        .contentType("application/json-patch+json")
+                        .content(patchBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Invalid JSON Patch document"));
     }
 
     // ── GET /api/loans/customer/{customerId} ─────────────────────────────────
@@ -242,6 +321,29 @@ class LoanControllerTest {
 
         mockMvc.perform(get("/api/loans/99/schedule"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void probeAccountServiceInstance_withLoadBalancedMode_returns200() throws Exception {
+        when(loanService.probeAccountServiceInstance("lb", null)).thenReturn(
+                java.util.Map.of("mode", "lb", "durationMs", 10L,
+                        "downstream", java.util.Map.of("instanceId", "account-service:8082:a1")));
+
+        mockMvc.perform(get("/api/loans/probe/account-instance"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("lb"))
+                .andExpect(jsonPath("$.downstream.instanceId").value("account-service:8082:a1"));
+    }
+
+    @Test
+    void probeAccountServiceInstance_withUnsupportedMode_returns400() throws Exception {
+        when(loanService.probeAccountServiceInstance("something", null))
+                .thenThrow(new IllegalArgumentException("Unsupported mode. Use 'lb' or 'direct'."));
+
+        mockMvc.perform(get("/api/loans/probe/account-instance")
+                        .param("mode", "something"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Unsupported mode. Use 'lb' or 'direct'."));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
