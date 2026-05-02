@@ -1,0 +1,21 @@
+﻿{
+    "requestCount":  100,
+    "direct":  {
+                   "averageEndToEndMs":  9.05
+               },
+    "loadBalanced":  {
+                         "averageEndToEndMs":  7.62,
+                         "distribution":  [
+                                              {
+                                                  "InstanceId":  "account-service:8092:14a2be4b5ea09aad738c8fee363e31f8",
+                                                  "Requests":  50,
+                                                  "Percentage":  50
+                                              },
+                                              {
+                                                  "InstanceId":  "account-service:8082:5327a3e17f0300f0ae4e9861e7deb5f6",
+                                                  "Requests":  50,
+                                                  "Percentage":  50
+                                              }
+                                          ]
+                     }
+}

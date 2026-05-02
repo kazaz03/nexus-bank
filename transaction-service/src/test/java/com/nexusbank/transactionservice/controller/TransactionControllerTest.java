@@ -7,6 +7,7 @@ import com.nexusbank.transactionservice.dto.response.TransactionResponse;
 import com.nexusbank.transactionservice.exception.GlobalExceptionHandler;
 import com.nexusbank.transactionservice.exception.ResourceNotFoundException;
 import com.nexusbank.transactionservice.service.TransactionService;
+import com.nexusbank.transactionservice.service.TransferService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,9 @@ class TransactionControllerTest {
 
     @MockBean
     private TransactionService transactionService;
+
+    @MockBean
+    private TransferService transferService;
 
     @Autowired
     private ObjectMapper objectMapper;
