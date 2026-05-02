@@ -1,14 +1,19 @@
 package com.nexusbank.transactionservice.controller;
 
+import com.nexusbank.transactionservice.dto.request.TransferRequest;
 import com.nexusbank.transactionservice.dto.response.ExchangeRateResponse;
 import com.nexusbank.transactionservice.dto.response.StatementResponse;
 import com.nexusbank.transactionservice.dto.response.TransactionResponse;
+import com.nexusbank.transactionservice.dto.response.TransferResponse;
 import com.nexusbank.transactionservice.service.TransactionService;
+import com.nexusbank.transactionservice.service.TransferService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,9 +25,18 @@ import java.util.List;
 public class TransactionController {
 
     private final TransactionService transactionService;
+    private final TransferService transferService;
 
-    public TransactionController(TransactionService transactionService) {
+    public TransactionController(TransactionService transactionService,
+                                 TransferService transferService) {
         this.transactionService = transactionService;
+        this.transferService = transferService;
+    }
+
+    @PostMapping("/transactions/transfer")
+    public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request) {
+        TransferResponse response = transferService.transfer(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/transactions/{id}")

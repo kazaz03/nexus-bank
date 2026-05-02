@@ -24,6 +24,22 @@ public class GlobalExceptionHandler {
         return buildError(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    /**
+     * Inter-service failures (Account Service unavailable, returned 4xx/5xx,
+     * timed out, etc.) are mapped to either 503 (retryable, e.g. network)
+     * or 422 (non-retryable, e.g. insufficient funds) using the suggested
+     * status carried on the exception.
+     */
+    @ExceptionHandler(AccountServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountService(AccountServiceException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", ex.getSuggestedStatus().value());
+        body.put("error", ex.getMessage());
+        body.put("retryable", ex.isRetryable());
+        return ResponseEntity.status(ex.getSuggestedStatus()).body(body);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = new HashMap<>();

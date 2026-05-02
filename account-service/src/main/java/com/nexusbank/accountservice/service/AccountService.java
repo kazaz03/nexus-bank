@@ -1,13 +1,18 @@
 package com.nexusbank.accountservice.service;
 
+import com.nexusbank.accountservice.dto.request.BalanceUpdateRequest;
 import com.nexusbank.accountservice.dto.request.CreateAccountRequest;
+import com.nexusbank.accountservice.dto.response.AccountInternalResponse;
 import com.nexusbank.accountservice.dto.response.AccountResponse;
 import com.nexusbank.accountservice.dto.response.BalanceResponse;
+import com.nexusbank.accountservice.dto.response.BalanceUpdateResponse;
 import com.nexusbank.accountservice.exception.AccountOperationException;
 import com.nexusbank.accountservice.exception.ResourceNotFoundException;
 import com.nexusbank.accountservice.model.Account;
 import com.nexusbank.accountservice.repository.AccountRepository;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +23,8 @@ import java.util.Random;
 
 @Service
 public class AccountService {
+
+    private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 
     private final AccountRepository accountRepository;
     private final ModelMapper modelMapper;
@@ -104,6 +111,104 @@ public class AccountService {
         accountRepository.save(account);
         return toResponse(account);
     }
+
+    //  Internal API used by other microservices via synchronous HTTP calls.
+    //  These methods are exposed through AccountInternalController
+    public AccountInternalResponse getInternalByIban(String iban) {
+        Account account = accountRepository.findByIban(iban)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found for IBAN: " + iban));
+        return toInternalResponse(account);
+    }
+
+    public AccountInternalResponse getInternalById(Long id) {
+        Account account = findById(id);
+        return toInternalResponse(account);
+    }
+
+    /**
+     * Atomically debits the given amount from the account. Returns the new
+     * balance on success. Throws {@link AccountOperationException} (mapped to
+     * HTTP 422) if the account is not active or has insufficient funds —
+     * the caller (Transaction Service) is responsible for handling this
+     * gracefully.
+     */
+    @Transactional
+    public BalanceUpdateResponse debit(Long accountId, BalanceUpdateRequest request) {
+        validateAmount(request.getAmount());
+
+        int rowsUpdated = accountRepository.debitIfSufficient(accountId, request.getAmount());
+        if (rowsUpdated != 1) {
+            // Either account not found, not ACTIVE, or insufficient funds.
+            // Distinguished by reading the row.
+            Account account = accountRepository.findById(accountId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Account not found: " + accountId));
+            if (account.getStatus() != Account.AccountStatus.ACTIVE) {
+                throw new AccountOperationException(
+                        "Account is not active (status=" + account.getStatus() + ")");
+            }
+            throw new AccountOperationException(
+                    "Insufficient funds on account " + account.getIban() +
+                            " (requested=" + request.getAmount() + ")");
+        }
+
+        // Re-read to obtain the new balance for the response.
+        Account updated = accountRepository.findById(accountId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found after debit: " + accountId));
+        log.info("Internal DEBIT applied: accountId={}, amount={}, ref={}, idempotencyKey={}",
+                accountId, request.getAmount(), request.getReference(), request.getIdempotencyKey());
+        return new BalanceUpdateResponse(
+                updated.getId(),
+                updated.getIban(),
+                updated.getCurrency(),
+                updated.getBalance());
+    }
+
+    /**
+     * Atomically credits the given amount to the account. Returns the new
+     * balance on success. Throws {@link AccountOperationException} if the
+     * account is not active.
+     */
+    @Transactional
+    public BalanceUpdateResponse credit(Long accountId, BalanceUpdateRequest request) {
+        validateAmount(request.getAmount());
+
+        int rowsUpdated = accountRepository.creditIfActive(accountId, request.getAmount());
+        if (rowsUpdated != 1) {
+            Account account = accountRepository.findById(accountId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Account not found: " + accountId));
+            throw new AccountOperationException(
+                    "Account is not active (status=" + account.getStatus() + ")");
+        }
+
+        Account updated = accountRepository.findById(accountId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found after credit: " + accountId));
+        log.info("Internal CREDIT applied: accountId={}, amount={}, ref={}, idempotencyKey={}",
+                accountId, request.getAmount(), request.getReference(), request.getIdempotencyKey());
+        return new BalanceUpdateResponse(
+                updated.getId(),
+                updated.getIban(),
+                updated.getCurrency(),
+                updated.getBalance());
+    }
+
+    private void validateAmount(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Amount must be greater than zero");
+        }
+    }
+
+    private AccountInternalResponse toInternalResponse(Account account) {
+        return new AccountInternalResponse(
+                account.getId(),
+                account.getCustomerId(),
+                account.getIban(),
+                account.getAccountType().name(),
+                account.getCurrency(),
+                account.getBalance(),
+                account.getOverdraftLimit(),
+                account.getStatus().name());
+    }
+
 
     private Account findById(Long id) {
         return accountRepository.findById(id)
