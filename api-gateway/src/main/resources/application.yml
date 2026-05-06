@@ -1,0 +1,104 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      # Automatically create routes from Eureka registrations.
+      # Disabled — we define routes explicitly below so paths are predictable.
+      discovery:
+        locator:
+          enabled: false
+
+      routes:
+
+        # ── user-service ─────────────────────────────────────────────────────
+        # Public: login and register do not require a token.
+        - id: user-service-auth
+          uri: lb://user-service
+          predicates:
+            - Path=/api/auth/**
+
+        # Protected: customer and admin management.
+        - id: user-service-protected
+          uri: lb://user-service
+          predicates:
+            - Path=/api/customers/**, /api/admin/**
+
+        # ── account-service ──────────────────────────────────────────────────
+        - id: account-service
+          uri: lb://account-service
+          predicates:
+            - Path=/api/accounts/**, /api/cards/**
+
+        # ── transaction-service ──────────────────────────────────────────────
+        - id: transaction-service
+          uri: lb://transaction-service
+          predicates:
+            - Path=/api/transactions/**, /api/exchange-rates/**
+
+        # ── loan-service ─────────────────────────────────────────────────────
+        - id: loan-service
+          uri: lb://loan-service
+          predicates:
+            - Path=/api/loans/**
+
+        # ── Swagger UI passthrough (per-service docs remain accessible) ───────
+        # The gateway forwards /user-service/swagger-ui.html etc. to each service.
+        - id: user-service-swagger
+          uri: lb://user-service
+          predicates:
+            - Path=/user-service/swagger-ui/**, /user-service/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        - id: account-service-swagger
+          uri: lb://account-service
+          predicates:
+            - Path=/account-service/swagger-ui/**, /account-service/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        - id: transaction-service-swagger
+          uri: lb://transaction-service
+          predicates:
+            - Path=/transaction-service/swagger-ui/**, /transaction-service/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        - id: loan-service-swagger
+          uri: lb://loan-service
+          predicates:
+            - Path=/loan-service/swagger-ui/**, /loan-service/api-docs/**
+          filters:
+            - StripPrefix=1
+
+# ── Eureka ────────────────────────────────────────────────────────────────────
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka}
+    healthcheck:
+      enabled: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}:${random.value}
+
+# ── JWT ───────────────────────────────────────────────────────────────────────
+# Must be identical to jwt.secret in user-service — tokens are signed there
+# and verified here.
+jwt:
+  secret: nexusBankSecretKey2025VeryLongAndSecureForHMACSHA256Algorithm
+
+# ── Actuator ──────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, gateway
+  endpoint:
+    gateway:
+      enabled: true
