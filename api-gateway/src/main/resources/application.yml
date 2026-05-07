@@ -101,4 +101,4 @@ management:
         include: health, info, gateway
   endpoint:
     gateway:
-      enabled: true
+      access: unrestricted
