@@ -5,20 +5,21 @@ import org.springframework.stereotype.Component;
 
 /**
  * Binds jwt.* properties from application.yml.
- * The secret must match the one configured in user-service exactly —
- * tokens are signed there and verified here.
+ *
+ * Only the RSA public key is required here — the gateway verifies tokens
+ * but never signs them. The private key lives exclusively in user-service.
  */
 @Component
 @ConfigurationProperties(prefix = "jwt")
 public class JwtProperties {
 
-    private String secret;
+    private String publicKeyPath;
 
-    public String getSecret() {
-        return secret;
+    public String getPublicKeyPath() {
+        return publicKeyPath;
     }
 
-    public void setSecret(String secret) {
-        this.secret = secret;
+    public void setPublicKeyPath(String publicKeyPath) {
+        this.publicKeyPath = publicKeyPath;
     }
 }

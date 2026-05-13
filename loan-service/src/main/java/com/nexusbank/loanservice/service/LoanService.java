@@ -183,8 +183,8 @@ public class LoanService {
                 .toList();
     }
 
-    public Map<String, Object> probeAccountServiceInstance(String mode, String directBaseUrl) {
-        return accountProbeClient.probe(mode, directBaseUrl);
+    public Map<String, Object> probeAccountServiceInstance(String mode, String directBaseUrl, Long accountId) {
+        return accountProbeClient.probe(mode, directBaseUrl, accountId);
     }
 
     private LoanApplication createPendingApplication(LoanApplicationRequest request) {

@@ -94,7 +94,8 @@ public class LoanController {
     @GetMapping("/probe/account-instance")
     public ResponseEntity<Map<String, Object>> probeAccountServiceInstance(
             @RequestParam(defaultValue = "lb") String mode,
-            @RequestParam(required = false) String directBaseUrl) {
-        return ResponseEntity.ok(loanService.probeAccountServiceInstance(mode, directBaseUrl));
+            @RequestParam(required = false) String directBaseUrl,
+            @RequestParam Long accountId) {
+        return ResponseEntity.ok(loanService.probeAccountServiceInstance(mode, directBaseUrl, accountId));
     }
 }

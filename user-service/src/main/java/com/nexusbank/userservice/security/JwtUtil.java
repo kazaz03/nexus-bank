@@ -3,25 +3,47 @@ package com.nexusbank.userservice.security;
 import com.nexusbank.userservice.model.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 import java.util.Date;
 
+/**
+ * Handles JWT generation and validation using RS256 (RSA + SHA-256).
+ *
+ * Tokens are signed with the RSA private key (held only by user-service)
+ * and verified with the corresponding public key. This means no other
+ * service needs the private key — they receive the public key only and
+ * can verify authenticity but cannot forge new tokens.
+ */
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret}")
-    private String secret;
+    @Value("${jwt.private-key-path}")
+    private Resource privateKeyResource;
+
+    @Value("${jwt.public-key-path}")
+    private Resource publicKeyResource;
 
     @Value("${jwt.expiration}")
     private long expiration;
 
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    private RSAPrivateKey privateKey;
+    private RSAPublicKey  publicKey;
+
+    @PostConstruct
+    public void init() throws Exception {
+        privateKey = loadPrivateKey();
+        publicKey  = loadPublicKey();
     }
 
     public String generateToken(User user) {
@@ -31,13 +53,13 @@ public class JwtUtil {
                 .claim("userId", user.getId())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSigningKey())
+                .signWith(privateKey)
                 .compact();
     }
 
     public Claims extractAllClaims(String token) {
         return Jwts.parser()
-                .verifyWith(getSigningKey())
+                .verifyWith(publicKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
@@ -61,5 +83,27 @@ public class JwtUtil {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    // ── key loading ───────────────────────────────────────────────────────────
+
+    private RSAPrivateKey loadPrivateKey() throws Exception {
+        String pem = new String(privateKeyResource.getInputStream().readAllBytes(), StandardCharsets.UTF_8)
+                .replace("-----BEGIN PRIVATE KEY-----", "")
+                .replace("-----END PRIVATE KEY-----", "")
+                .replaceAll("\\s", "");
+        byte[] keyBytes = Base64.getDecoder().decode(pem);
+        return (RSAPrivateKey) KeyFactory.getInstance("RSA")
+                .generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+    }
+
+    private RSAPublicKey loadPublicKey() throws Exception {
+        String pem = new String(publicKeyResource.getInputStream().readAllBytes(), StandardCharsets.UTF_8)
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replaceAll("\\s", "");
+        byte[] keyBytes = Base64.getDecoder().decode(pem);
+        return (RSAPublicKey) KeyFactory.getInstance("RSA")
+                .generatePublic(new X509EncodedKeySpec(keyBytes));
     }
 }

@@ -4,12 +4,12 @@ import com.nexusbank.apigateway.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,8 +19,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import javax.crypto.SecretKey;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 
@@ -29,6 +33,9 @@ import java.util.List;
  *
  * Public paths (login, register, Swagger, actuator) are whitelisted and pass
  * through without a token. All other paths require a valid Bearer JWT.
+ *
+ * Tokens are verified using the RSA public key only — the gateway cannot
+ * forge tokens because it never holds the private key.
  *
  * On success the filter forwards three additional headers to the downstream
  * service so it knows who is making the call without re-parsing the token:
@@ -49,22 +56,19 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final List<String> PUBLIC_PATHS = List.of(
             "/api/auth/login",
             "/api/auth/register",
-            // Per-service Swagger UI / OpenAPI docs
             "/api-docs",
             "/swagger-ui",
-            // Actuator health (used by Eureka)
             "/actuator"
     );
 
-    private final JwtProperties jwtProperties;
+    private final RSAPublicKey publicKey;
 
     public JwtAuthenticationFilter(JwtProperties jwtProperties) {
-        this.jwtProperties = jwtProperties;
+        this.publicKey = loadPublicKey(jwtProperties.getPublicKeyPath());
     }
 
     @Override
     public int getOrder() {
-        // Run before routing filters so we can reject early
         return -100;
     }
 
@@ -87,8 +91,6 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         try {
             Claims claims = parseToken(token);
 
-            // Forward caller identity as plain headers — downstream services
-            // read these instead of re-validating the JWT themselves.
             ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                     .header("X-User-Id",    String.valueOf(claims.get("userId")))
                     .header("X-User-Email", claims.getSubject())
@@ -110,11 +112,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     private Claims parseToken(String token) {
-        SecretKey key = Keys.hmacShaKeyFor(
-                jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
-
         Claims claims = Jwts.parser()
-                .verifyWith(key)
+                .verifyWith(publicKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
@@ -139,5 +138,21 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         var buffer = response.bufferFactory().wrap(body.getBytes(StandardCharsets.UTF_8));
         return response.writeWith(Mono.just(buffer));
+    }
+
+    private static RSAPublicKey loadPublicKey(String path) {
+        try {
+            String resourcePath = path.startsWith("classpath:") ? path.substring(10) : path;
+            byte[] pemBytes = new ClassPathResource(resourcePath).getInputStream().readAllBytes();
+            String pem = new String(pemBytes, StandardCharsets.UTF_8)
+                    .replace("-----BEGIN PUBLIC KEY-----", "")
+                    .replace("-----END PUBLIC KEY-----", "")
+                    .replaceAll("\\s", "");
+            byte[] keyBytes = Base64.getDecoder().decode(pem);
+            return (RSAPublicKey) KeyFactory.getInstance("RSA")
+                    .generatePublic(new X509EncodedKeySpec(keyBytes));
+        } catch (IOException | java.security.GeneralSecurityException e) {
+            throw new IllegalStateException("Failed to load RSA public key from: " + path, e);
+        }
     }
 }

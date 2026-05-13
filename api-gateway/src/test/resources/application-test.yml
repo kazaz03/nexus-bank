@@ -12,4 +12,4 @@ eureka:
     fetch-registry: false
 
 jwt:
-  secret: nexusBankSecretKey2025VeryLongAndSecureForHMACSHA256Algorithm
+  public-key-path: classpath:keys/public.pem

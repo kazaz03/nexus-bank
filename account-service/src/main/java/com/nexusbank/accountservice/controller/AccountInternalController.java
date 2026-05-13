@@ -5,6 +5,7 @@ import com.nexusbank.accountservice.dto.response.AccountInternalResponse;
 import com.nexusbank.accountservice.dto.response.BalanceUpdateResponse;
 import com.nexusbank.accountservice.service.AccountService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/accounts/internal")
 public class AccountInternalController {
 
+    @Value("${app.instance-id:unknown}")
+    private String instanceId;
+
     private final AccountService accountService;
 
     public AccountInternalController(AccountService accountService) {
@@ -37,7 +41,9 @@ public class AccountInternalController {
 
     @GetMapping("/{id}")
     public ResponseEntity<AccountInternalResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(accountService.getInternalById(id));
+        return ResponseEntity.ok()
+                .header("X-Serving-Instance", instanceId)
+                .body(accountService.getInternalById(id));
     }
 
     @PostMapping("/{id}/debit")
