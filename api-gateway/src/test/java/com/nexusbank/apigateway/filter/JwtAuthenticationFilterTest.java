@@ -1,17 +1,19 @@
 package com.nexusbank.apigateway.filter;
 
-import com.nexusbank.apigateway.config.JwtProperties;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
 import java.util.Date;
 
 /**
@@ -27,6 +29,10 @@ import java.util.Date;
  * Protected paths with an invalid token return 401.
  * Protected paths with a valid token are forwarded (may get 503 because
  * downstream is not running, but NOT 401).
+ *
+ * Tokens are signed here with the RSA private key (from test resources).
+ * The gateway verifies them using only the public key — mirroring the
+ * production separation of signing and verification responsibilities.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -35,16 +41,12 @@ class JwtAuthenticationFilterTest {
     @Autowired
     private WebTestClient webTestClient;
 
-    @Autowired
-    private JwtProperties jwtProperties;
-
     private String validToken;
     private String expiredToken;
 
     @BeforeEach
-    void setUp() {
-        SecretKey key = Keys.hmacShaKeyFor(
-                jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
+    void setUp() throws Exception {
+        RSAPrivateKey privateKey = loadTestPrivateKey();
 
         validToken = Jwts.builder()
                 .subject("admin@nexusbank.com")
@@ -52,7 +54,7 @@ class JwtAuthenticationFilterTest {
                 .claim("userId", 1L)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 86_400_000))
-                .signWith(key)
+                .signWith(privateKey)
                 .compact();
 
         expiredToken = Jwts.builder()
@@ -61,7 +63,7 @@ class JwtAuthenticationFilterTest {
                 .claim("userId", 1L)
                 .issuedAt(new Date(System.currentTimeMillis() - 200_000))
                 .expiration(new Date(System.currentTimeMillis() - 100_000))
-                .signWith(key)
+                .signWith(privateKey)
                 .compact();
     }
 
@@ -69,8 +71,6 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void loginPath_withNoToken_isNotRejectedByFilter() {
-        // The filter should not return 401 for /api/auth/login.
-        // (The request will fail for another reason — no upstream — but not 401.)
         webTestClient.post()
                 .uri("/api/auth/login")
                 .exchange()
@@ -132,9 +132,6 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void protectedPath_withValidToken_isForwardedByFilter() {
-        // Filter accepts the token; request reaches routing layer.
-        // Without a real downstream service we get 503 (no route) or similar,
-        // but NOT 401 — the filter passed.
         webTestClient.get()
                 .uri("/api/customers")
                 .header("Authorization", "Bearer " + validToken)
@@ -155,5 +152,18 @@ class JwtAuthenticationFilterTest {
                 .jsonPath("$.status").isEqualTo(401)
                 .jsonPath("$.error").exists()
                 .jsonPath("$.path").isEqualTo("/api/customers");
+    }
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    private static RSAPrivateKey loadTestPrivateKey() throws Exception {
+        byte[] pemBytes = new ClassPathResource("keys/private.pem").getInputStream().readAllBytes();
+        String pem = new String(pemBytes, StandardCharsets.UTF_8)
+                .replace("-----BEGIN PRIVATE KEY-----", "")
+                .replace("-----END PRIVATE KEY-----", "")
+                .replaceAll("\\s", "");
+        byte[] keyBytes = Base64.getDecoder().decode(pem);
+        return (RSAPrivateKey) KeyFactory.getInstance("RSA")
+                .generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
     }
 }

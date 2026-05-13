@@ -1,6 +1,7 @@
 param(
     [string]$LoanServiceBaseUrl = "http://localhost:8084",
     [string]$DirectAccountServiceBaseUrl = "http://localhost:8082",
+    [long]$AccountId = 1,
     [int]$RequestCount = 100,
     [string]$OutputPath = "./scripts/load-balancing-report.json"
 )
@@ -9,13 +10,19 @@ if ($RequestCount -lt 1) {
     throw "RequestCount must be >= 1"
 }
 
-function Invoke-Probe {
+# Each call goes through loan-service → account-service GET /api/accounts/internal/{id}.
+# That endpoint does a real JPA/MySQL lookup, so the latency figures reflect actual
+# I/O work rather than the static probe response the previous version used.
+# The account-service stamps X-Serving-Instance on every /internal/{id} response;
+# loan-service reads that header and returns it as `instanceId` in the wrapper,
+# giving us instance distribution without a dedicated diagnostic controller.
+function Invoke-AccountLookup {
     param(
         [string]$Mode,
         [string]$DirectBaseUrl
     )
 
-    $url = "$LoanServiceBaseUrl/api/loans/probe/account-instance?mode=$Mode"
+    $url = "$LoanServiceBaseUrl/api/loans/probe/account-instance?mode=$Mode&accountId=$AccountId"
     if ($Mode -eq "direct") {
         $encoded = [System.Uri]::EscapeDataString($DirectBaseUrl)
         $url = "$url&directBaseUrl=$encoded"
@@ -26,33 +33,33 @@ function Invoke-Probe {
     $outer.Stop()
 
     $instanceId = "unknown"
-    if ($null -ne $response.downstream -and $response.downstream.instanceId) {
-        $instanceId = [string]$response.downstream.instanceId
+    if ($null -ne $response.instanceId -and $response.instanceId -ne "") {
+        $instanceId = [string]$response.instanceId
     }
 
     [PSCustomObject]@{
-        Mode = $Mode
-        InstanceId = $instanceId
-        EndToEndMs = [double]$outer.Elapsed.TotalMilliseconds
+        Mode         = $Mode
+        InstanceId   = $instanceId
+        EndToEndMs   = [double]$outer.Elapsed.TotalMilliseconds
         DownstreamMs = [double]$response.durationMs
-        Target = [string]$response.target
+        Target       = [string]$response.target
     }
 }
 
-Write-Host "Running $RequestCount direct-mode requests..."
+Write-Host "Running $RequestCount direct-mode requests (account lookup, accountId=$AccountId)..."
 $directResults = for ($i = 1; $i -le $RequestCount; $i++) {
-    Invoke-Probe -Mode "direct" -DirectBaseUrl $DirectAccountServiceBaseUrl
+    Invoke-AccountLookup -Mode "direct" -DirectBaseUrl $DirectAccountServiceBaseUrl
 }
 
-Write-Host "Running $RequestCount load-balanced requests..."
+Write-Host "Running $RequestCount load-balanced requests (account lookup, accountId=$AccountId)..."
 $lbResults = for ($i = 1; $i -le $RequestCount; $i++) {
-    Invoke-Probe -Mode "lb" -DirectBaseUrl $DirectAccountServiceBaseUrl
+    Invoke-AccountLookup -Mode "lb" -DirectBaseUrl $DirectAccountServiceBaseUrl
 }
 
-$directAvgEndToEnd = ($directResults | Measure-Object -Property EndToEndMs -Average).Average
+$directAvgEndToEnd   = ($directResults | Measure-Object -Property EndToEndMs   -Average).Average
 $directAvgDownstream = ($directResults | Measure-Object -Property DownstreamMs -Average).Average
-$lbAvgEndToEnd = ($lbResults | Measure-Object -Property EndToEndMs -Average).Average
-$lbAvgDownstream = ($lbResults | Measure-Object -Property DownstreamMs -Average).Average
+$lbAvgEndToEnd       = ($lbResults     | Measure-Object -Property EndToEndMs   -Average).Average
+$lbAvgDownstream     = ($lbResults     | Measure-Object -Property DownstreamMs -Average).Average
 
 $lbDistribution = $lbResults |
     Group-Object -Property InstanceId |
@@ -60,21 +67,22 @@ $lbDistribution = $lbResults |
     ForEach-Object {
         [PSCustomObject]@{
             InstanceId = $_.Name
-            Requests = $_.Count
+            Requests   = $_.Count
             Percentage = [math]::Round(($_.Count / $RequestCount) * 100, 2)
         }
     }
 
 $summary = [PSCustomObject]@{
     requestCount = $RequestCount
-    direct = [PSCustomObject]@{
-        averageEndToEndMs = [math]::Round($directAvgEndToEnd, 2)
+    accountId    = $AccountId
+    direct       = [PSCustomObject]@{
+        averageEndToEndMs   = [math]::Round($directAvgEndToEnd, 2)
         averageDownstreamMs = [math]::Round($directAvgDownstream, 2)
     }
     loadBalanced = [PSCustomObject]@{
-        averageEndToEndMs = [math]::Round($lbAvgEndToEnd, 2)
+        averageEndToEndMs   = [math]::Round($lbAvgEndToEnd, 2)
         averageDownstreamMs = [math]::Round($lbAvgDownstream, 2)
-        distribution = $lbDistribution
+        distribution        = $lbDistribution
     }
 }
 
@@ -85,10 +93,10 @@ $lbDistribution | Format-Table -AutoSize
 Write-Host ""
 Write-Host "Average timings (ms):"
 [PSCustomObject]@{
-    directAverageEndToEndMs = [math]::Round($directAvgEndToEnd, 2)
+    directAverageEndToEndMs   = [math]::Round($directAvgEndToEnd, 2)
     directAverageDownstreamMs = [math]::Round($directAvgDownstream, 2)
-    lbAverageEndToEndMs = [math]::Round($lbAvgEndToEnd, 2)
-    lbAverageDownstreamMs = [math]::Round($lbAvgDownstream, 2)
+    lbAverageEndToEndMs       = [math]::Round($lbAvgEndToEnd, 2)
+    lbAverageDownstreamMs     = [math]::Round($lbAvgDownstream, 2)
 } | Format-List
 
 $directory = Split-Path -Parent $OutputPath

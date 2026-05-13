@@ -325,23 +325,25 @@ class LoanControllerTest {
 
     @Test
     void probeAccountServiceInstance_withLoadBalancedMode_returns200() throws Exception {
-        when(loanService.probeAccountServiceInstance("lb", null)).thenReturn(
+        when(loanService.probeAccountServiceInstance("lb", null, 1L)).thenReturn(
                 java.util.Map.of("mode", "lb", "durationMs", 10L,
-                        "downstream", java.util.Map.of("instanceId", "account-service:8082:a1")));
+                        "instanceId", "account-service:8082:a1"));
 
-        mockMvc.perform(get("/api/loans/probe/account-instance"))
+        mockMvc.perform(get("/api/loans/probe/account-instance")
+                        .param("accountId", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mode").value("lb"))
-                .andExpect(jsonPath("$.downstream.instanceId").value("account-service:8082:a1"));
+                .andExpect(jsonPath("$.instanceId").value("account-service:8082:a1"));
     }
 
     @Test
     void probeAccountServiceInstance_withUnsupportedMode_returns400() throws Exception {
-        when(loanService.probeAccountServiceInstance("something", null))
+        when(loanService.probeAccountServiceInstance("something", null, 1L))
                 .thenThrow(new IllegalArgumentException("Unsupported mode. Use 'lb' or 'direct'."));
 
         mockMvc.perform(get("/api/loans/probe/account-instance")
-                        .param("mode", "something"))
+                        .param("mode", "something")
+                        .param("accountId", "1"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Unsupported mode. Use 'lb' or 'direct'."));
     }

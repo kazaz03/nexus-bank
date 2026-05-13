@@ -1,4 +1,11 @@
 .idea/
+
+# Maven build output
+target/
+
+# Load-balancing script output reports
+scripts/*-report.json
+
 # Compiled class file
 *.class
 

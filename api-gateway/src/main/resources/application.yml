@@ -88,10 +88,10 @@ eureka:
     instance-id: ${spring.application.name}:${server.port}:${random.value}
 
 # ── JWT ───────────────────────────────────────────────────────────────────────
-# Must be identical to jwt.secret in user-service — tokens are signed there
-# and verified here.
+# Only the RSA public key is needed here. Tokens are signed by user-service
+# with the private key; the gateway verifies them with the public key only.
 jwt:
-  secret: nexusBankSecretKey2025VeryLongAndSecureForHMACSHA256Algorithm
+  public-key-path: classpath:keys/public.pem
 
 # ── Actuator ──────────────────────────────────────────────────────────────────
 management:

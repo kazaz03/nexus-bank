@@ -365,11 +365,11 @@ class LoanServiceTest {
 
     @Test
     void probeAccountServiceInstance_delegatesToClient() {
-        when(accountProbeClient.probe("lb", null)).thenReturn(Map.of("mode", "lb"));
+        when(accountProbeClient.probe("lb", null, 1L)).thenReturn(Map.of("mode", "lb"));
 
-        Map<String, Object> result = loanService.probeAccountServiceInstance("lb", null);
+        Map<String, Object> result = loanService.probeAccountServiceInstance("lb", null, 1L);
 
         assertThat(result).containsEntry("mode", "lb");
-        verify(accountProbeClient).probe("lb", null);
+        verify(accountProbeClient).probe("lb", null, 1L);
     }
 }
