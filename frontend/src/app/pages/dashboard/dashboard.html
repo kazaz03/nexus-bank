@@ -1,0 +1,49 @@
+<header class="topbar">
+  <h1>Nexus Bank</h1>
+  <div class="user">
+    <span>{{ email }} · <strong>{{ role }}</strong></span>
+    <button (click)="logout()">Logout</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+  @if (role === 'LOAN_OFFICER' || role === 'ADMIN') {
+    <a routerLink="/loans" routerLinkActive="active">Loan queue</a>
+  }
+</nav>
+
+<main>
+  @if (role === 'TELLER' || role === 'ADMIN') {
+    <section>
+      <h2>Customers</h2>
+      @if (loading()) {
+        <p>Loading…</p>
+      } @else if (error()) {
+        <p class="error">{{ error() }}</p>
+      } @else {
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Name</th><th>Email</th><th>KYC</th></tr>
+          </thead>
+          <tbody>
+            @for (c of customers(); track c.id) {
+              <tr>
+                <td>{{ c.id }}</td>
+                <td>{{ c.firstName }} {{ c.lastName }}</td>
+                <td>{{ c.email }}</td>
+                <td>{{ c.kycStatus }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+  } @else {
+    <section>
+      <h2>Welcome, {{ email }}</h2>
+      <p class="muted">You are signed in as <strong>{{ role }}</strong>. Customer screens
+        (accounts, transfers, statements) will be added in the upcoming iteration.</p>
+    </section>
+  }
+</main>

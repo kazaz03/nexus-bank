@@ -4,12 +4,15 @@ import com.nexusbank.loanservice.dto.request.LoanApplicationRequest;
 import com.nexusbank.loanservice.dto.request.LoanReviewRequest;
 import com.nexusbank.loanservice.dto.response.LoanApplicationResponse;
 import com.nexusbank.loanservice.dto.response.RepaymentScheduleResponse;
+import com.nexusbank.loanservice.messaging.LoanEventPublisher;
 import com.nexusbank.loanservice.repository.LoanApplicationRepository;
 import com.nexusbank.loanservice.repository.RepaymentScheduleRepository;
+import com.nexusbank.loanservice.service.LoanService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpEntity;
@@ -53,6 +56,13 @@ class LoanLifecycleIntegrationTest {
 
     @Autowired
     RepaymentScheduleRepository repaymentScheduleRepository;
+
+    @Autowired
+    LoanService loanService;
+
+    // F14 saga publisher is mocked so tests can run without a RabbitMQ broker.
+    @MockBean
+    LoanEventPublisher loanEventPublisher;
 
     @BeforeEach
     void cleanDatabase() {
@@ -188,7 +198,7 @@ class LoanLifecycleIntegrationTest {
     // ── Review: approve ───────────────────────────────────────────────────────
 
     @Test
-    void approveApplication_updatesStatusAndGeneratesRepaymentSchedule() {
+    void approveApplication_putsLoanIntoApprovedAndPublishesEvent() {
         LoanApplicationResponse created = submit(40L, 1L, "12000.00", 12,
                 "Business expansion");
 
@@ -201,18 +211,44 @@ class LoanLifecycleIntegrationTest {
         assertThat(body.getAmountApproved()).isEqualByComparingTo(new BigDecimal("12000.00"));
         assertThat(body.getInterestRate()).isEqualByComparingTo(new BigDecimal("6.00"));
 
-        // 12-month loan must produce exactly 12 repayment schedule entries
+        // Schedule is generated only after the disbursement saga completes, not on approval.
         ResponseEntity<RepaymentScheduleResponse[]> scheduleResponse = restTemplate.getForEntity(
                 "/api/loans/" + created.getId() + "/schedule",
                 RepaymentScheduleResponse[].class);
-
         assertThat(scheduleResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        RepaymentScheduleResponse[] schedule = scheduleResponse.getBody();
-        assertThat(schedule).hasSize(12);
-        assertThat(schedule[0].getInstallmentNumber()).isEqualTo(1);
-        assertThat(schedule[11].getInstallmentNumber()).isEqualTo(12);
-        assertThat(schedule).extracting(RepaymentScheduleResponse::getStatus)
-                .allMatch("PENDING"::equals);
+        assertThat(scheduleResponse.getBody()).isEmpty();
+    }
+
+    @Test
+    void markAsDisbursed_finalizesLoanAndCreatesSchedule() {
+        LoanApplicationResponse created = submit(42L, 1L, "6000.00", 6, "Short-term");
+        approve(created.getId(), "6000.00", "5.00", 99L);
+
+        // Simulate the account-service confirmation (loan.disbursement.completed event)
+        // by invoking the service method the listener would call.
+        loanService.markAsDisbursed(created.getId());
+
+        ResponseEntity<LoanApplicationResponse> after = restTemplate.getForEntity(
+                "/api/loans/" + created.getId(), LoanApplicationResponse.class);
+        assertThat(after.getBody().getStatus()).isEqualTo("DISBURSED");
+
+        ResponseEntity<RepaymentScheduleResponse[]> schedule = restTemplate.getForEntity(
+                "/api/loans/" + created.getId() + "/schedule",
+                RepaymentScheduleResponse[].class);
+        assertThat(schedule.getBody()).hasSize(6);
+    }
+
+    @Test
+    void markAsRejectedAfterFailedDisbursement_rollsLoanBack() {
+        LoanApplicationResponse created = submit(43L, 1L, "4000.00", 12, "Trip");
+        approve(created.getId(), "4000.00", "5.00", 99L);
+
+        loanService.markAsRejectedAfterFailedDisbursement(created.getId(), "Account closed");
+
+        ResponseEntity<LoanApplicationResponse> after = restTemplate.getForEntity(
+                "/api/loans/" + created.getId(), LoanApplicationResponse.class);
+        assertThat(after.getBody().getStatus()).isEqualTo("REJECTED");
+        assertThat(after.getBody().getRejectionReason()).contains("Account closed");
     }
 
     @Test
@@ -351,9 +387,10 @@ class LoanLifecycleIntegrationTest {
     }
 
     @Test
-    void getRepaymentSchedule_afterApproval_hasCorrectInstallmentCount() {
+    void getRepaymentSchedule_afterDisbursement_hasCorrectInstallmentCount() {
         LoanApplicationResponse created = submit(71L, 1L, "6000.00", 6, "Short-term");
         approve(created.getId(), "6000.00", "5.00", 99L);
+        loanService.markAsDisbursed(created.getId());
 
         ResponseEntity<RepaymentScheduleResponse[]> response = restTemplate.getForEntity(
                 "/api/loans/" + created.getId() + "/schedule",
