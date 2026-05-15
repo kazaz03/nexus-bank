@@ -1,0 +1,26 @@
+<div class="card">
+  <h1>Nexus Bank</h1>
+  <p class="muted">Sign in to your account</p>
+
+  <form (ngSubmit)="submit()" #f="ngForm">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" [(ngModel)]="email" required>
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" [(ngModel)]="password" required>
+
+    <button type="submit" [disabled]="loading() || f.invalid">
+      {{ loading() ? 'Signing in…' : 'Sign in' }}
+    </button>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+  </form>
+
+  <p class="hint">
+    Test users: <code>admin&#64;nexusbank.com / admin123</code>,
+    <code>edin.hasanovic&#64;nexusbank.com / password3</code> (LOAN_OFFICER),
+    <code>marko.nikolic&#64;nexusbank.com / password1</code> (CUSTOMER).
+  </p>
+</div>

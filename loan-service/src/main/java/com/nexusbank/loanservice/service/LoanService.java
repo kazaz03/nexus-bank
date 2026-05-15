@@ -12,11 +12,15 @@ import com.nexusbank.loanservice.dto.request.LoanReviewRequest;
 import com.nexusbank.loanservice.dto.response.LoanApplicationResponse;
 import com.nexusbank.loanservice.dto.response.RepaymentScheduleResponse;
 import com.nexusbank.loanservice.exception.ResourceNotFoundException;
+import com.nexusbank.loanservice.messaging.LoanEventPublisher;
+import com.nexusbank.loanservice.messaging.event.LoanApprovedEvent;
 import com.nexusbank.loanservice.model.LoanApplication;
 import com.nexusbank.loanservice.model.RepaymentSchedule;
 import com.nexusbank.loanservice.repository.LoanApplicationRepository;
 import com.nexusbank.loanservice.repository.RepaymentScheduleRepository;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -34,23 +38,27 @@ import java.util.Map;
 
 @Service
 public class LoanService {
+    private static final Logger log = LoggerFactory.getLogger(LoanService.class);
 
     private final LoanApplicationRepository loanApplicationRepository;
     private final RepaymentScheduleRepository repaymentScheduleRepository;
     private final ModelMapper modelMapper;
     private final ObjectMapper objectMapper;
     private final AccountProbeClient accountProbeClient;
+    private final LoanEventPublisher loanEventPublisher;
 
     public LoanService(LoanApplicationRepository loanApplicationRepository,
                        RepaymentScheduleRepository repaymentScheduleRepository,
                        ModelMapper modelMapper,
                        ObjectMapper objectMapper,
-                       AccountProbeClient accountProbeClient) {
+                       AccountProbeClient accountProbeClient,
+                       LoanEventPublisher loanEventPublisher) {
         this.loanApplicationRepository = loanApplicationRepository;
         this.repaymentScheduleRepository = repaymentScheduleRepository;
         this.modelMapper = modelMapper;
         this.objectMapper = objectMapper;
         this.accountProbeClient = accountProbeClient;
+        this.loanEventPublisher = loanEventPublisher;
     }
 
     @Transactional
@@ -147,6 +155,17 @@ public class LoanService {
         return toResponse(application);
     }
 
+    /**
+     * Starts the F14 disbursement saga when a loan is approved.
+     *
+     * On approval the loan is persisted in the intermediate APPROVED state
+     * (first local transaction) and a loan.approved event is published. The
+     * account-service consumes it, credits the customer's account (second
+     * local transaction) and replies with either a completed or failed event.
+     * The terminal state (DISBURSED or REJECTED) is set by the listener.
+     *
+     * Rejection goes straight to REJECTED — no saga needed.
+     */
     @Transactional
     public LoanApplicationResponse reviewApplication(Long id, LoanReviewRequest request) {
         LoanApplication application = findById(id);
@@ -166,7 +185,13 @@ public class LoanService {
             application.setAmountApproved(request.getAmountApproved());
             application.setInterestRate(request.getInterestRate());
             loanApplicationRepository.save(application);
-            generateRepaymentSchedule(application);
+
+            loanEventPublisher.publishLoanApproved(new LoanApprovedEvent(
+                    application.getId(),
+                    application.getCustomerId(),
+                    application.getAccountId(),
+                    application.getAmountApproved(),
+                    application.getCurrency()));
         } else {
             application.setStatus(LoanApplication.LoanStatus.REJECTED);
             application.setRejectionReason(request.getRejectionReason());
@@ -174,6 +199,54 @@ public class LoanService {
         }
 
         return toResponse(application);
+    }
+
+    /**
+     * Finalizes the saga: the second local transaction (credit to account)
+     * succeeded, so we move the loan to DISBURSED and generate the repayment
+     * schedule. Idempotent — re-delivery of the event is a no-op.
+     */
+    @Transactional
+    public void markAsDisbursed(Long loanId) {
+        log.info("markAsDisbursed called for loanId={}", loanId);
+        LoanApplication application = findById(loanId);
+        log.info("Found application: id={}, status={}", application.getId(), application.getStatus());
+        if (application.getStatus() == LoanApplication.LoanStatus.DISBURSED) {
+            log.info("Loan {} already DISBURSED, returning early", loanId);
+            return;
+        }
+        if (application.getStatus() != LoanApplication.LoanStatus.APPROVED) {
+            log.error("Cannot mark loan {} as DISBURSED, current status is {}", loanId, application.getStatus());
+            throw new IllegalStateException(
+                    "Cannot mark loan " + loanId + " as DISBURSED from status " + application.getStatus());
+        }
+        log.info("Updating loan {} status from {} to DISBURSED", loanId, application.getStatus());
+        application.setStatus(LoanApplication.LoanStatus.DISBURSED);
+        loanApplicationRepository.save(application);
+        log.info("Loan {} saved with DISBURSED status", loanId);
+        generateRepaymentSchedule(application);
+        log.info("Repayment schedule generated for loan {}", loanId);
+    }
+
+    /**
+     * Inverse action when the second local transaction fails: roll the loan
+     * back to REJECTED with the failure reason so the system stays consistent.
+     */
+    @Transactional
+    public void markAsRejectedAfterFailedDisbursement(Long loanId, String reason) {
+        LoanApplication application = findById(loanId);
+        if (application.getStatus() == LoanApplication.LoanStatus.REJECTED) {
+            return;
+        }
+        if (application.getStatus() != LoanApplication.LoanStatus.APPROVED) {
+            throw new IllegalStateException(
+                    "Cannot roll loan " + loanId + " back from status " + application.getStatus());
+        }
+        application.setStatus(LoanApplication.LoanStatus.REJECTED);
+        application.setRejectionReason("Disbursement failed: " + reason);
+        application.setAmountApproved(null);
+        application.setInterestRate(null);
+        loanApplicationRepository.save(application);
     }
 
     public List<RepaymentScheduleResponse> getRepaymentSchedule(Long loanId) {

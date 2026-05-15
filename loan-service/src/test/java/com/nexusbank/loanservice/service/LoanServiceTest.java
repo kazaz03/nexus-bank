@@ -10,6 +10,8 @@ import com.nexusbank.loanservice.dto.request.LoanApplicationPatchRequest;
 import com.nexusbank.loanservice.dto.response.LoanApplicationResponse;
 import com.nexusbank.loanservice.dto.response.RepaymentScheduleResponse;
 import com.nexusbank.loanservice.exception.ResourceNotFoundException;
+import com.nexusbank.loanservice.messaging.LoanEventPublisher;
+import com.nexusbank.loanservice.messaging.event.LoanApprovedEvent;
 import com.nexusbank.loanservice.model.LoanApplication;
 import com.nexusbank.loanservice.model.RepaymentSchedule;
 import com.nexusbank.loanservice.repository.LoanApplicationRepository;
@@ -56,6 +58,9 @@ class LoanServiceTest {
 
     @Mock
     private AccountProbeClient accountProbeClient;
+
+    @Mock
+    private LoanEventPublisher loanEventPublisher;
 
     @InjectMocks
     private LoanService loanService;
@@ -256,18 +261,15 @@ class LoanServiceTest {
     // ── reviewApplication – approval ─────────────────────────────────────────
 
     @Test
-    void reviewApplication_approval_setsApprovedStatusAndGeneratesSchedule() {
+    void reviewApplication_approval_setsApprovedStatusAndPublishesEvent() {
         LoanReviewRequest request = new LoanReviewRequest();
         request.setApproved(true);
         request.setAmountApproved(BigDecimal.valueOf(5000));
         request.setInterestRate(BigDecimal.valueOf(6.0));
         request.setReviewedBy(5L);
 
-        pendingLoan.setTermMonths(3); // small number for manageable schedule generation
-
         when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(pendingLoan));
         when(loanApplicationRepository.save(any())).thenReturn(pendingLoan);
-        when(repaymentScheduleRepository.saveAll(any())).thenReturn(List.of());
 
         LoanApplicationResponse approvedResponse = new LoanApplicationResponse();
         approvedResponse.setId(1L);
@@ -280,8 +282,46 @@ class LoanServiceTest {
         assertThat(result.getStatus()).isEqualTo("APPROVED");
         verify(loanApplicationRepository).save(argThat(l ->
                 l.getStatus() == LoanApplication.LoanStatus.APPROVED));
+        // Schedule generation is deferred until the disbursement saga completes.
+        verify(repaymentScheduleRepository, never()).saveAll(any());
+        verify(loanEventPublisher).publishLoanApproved(any(LoanApprovedEvent.class));
+    }
+
+    @Test
+    void markAsDisbursed_generatesScheduleAndFinalizesLoan() {
+        pendingLoan.setStatus(LoanApplication.LoanStatus.APPROVED);
+        pendingLoan.setAmountApproved(BigDecimal.valueOf(3000));
+        pendingLoan.setInterestRate(BigDecimal.valueOf(6.0));
+        pendingLoan.setTermMonths(3);
+
+        when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(pendingLoan));
+        when(loanApplicationRepository.save(any())).thenReturn(pendingLoan);
+        when(repaymentScheduleRepository.saveAll(any())).thenReturn(List.of());
+
+        loanService.markAsDisbursed(1L);
+
+        verify(loanApplicationRepository).save(argThat(l ->
+                l.getStatus() == LoanApplication.LoanStatus.DISBURSED));
         verify(repaymentScheduleRepository).saveAll(argThat(schedules ->
                 ((List<?>) schedules).size() == 3));
+    }
+
+    @Test
+    void markAsRejectedAfterFailedDisbursement_rollsLoanBackAndStoresReason() {
+        pendingLoan.setStatus(LoanApplication.LoanStatus.APPROVED);
+        pendingLoan.setAmountApproved(BigDecimal.valueOf(3000));
+        pendingLoan.setInterestRate(BigDecimal.valueOf(6.0));
+
+        when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(pendingLoan));
+        when(loanApplicationRepository.save(any())).thenReturn(pendingLoan);
+
+        loanService.markAsRejectedAfterFailedDisbursement(1L, "Account not active");
+
+        verify(loanApplicationRepository).save(argThat(l ->
+                l.getStatus() == LoanApplication.LoanStatus.REJECTED
+                        && l.getRejectionReason() != null
+                        && l.getRejectionReason().contains("Account not active")
+                        && l.getAmountApproved() == null));
     }
 
     @Test

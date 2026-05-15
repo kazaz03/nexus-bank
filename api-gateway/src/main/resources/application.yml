@@ -13,6 +13,28 @@ spring:
         locator:
           enabled: false
 
+      # Allow the Angular dev server (http://localhost:4200) to call the API
+      # gateway from the browser. add-to-simple-url-handler-mapping=true is
+      # required so the gateway answers CORS preflight (OPTIONS) requests on
+      # public paths like /api/auth/login before the JWT filter rejects them.
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:4200"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            exposedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
       routes:
 
         # ── user-service ─────────────────────────────────────────────────────
@@ -102,3 +124,8 @@ management:
   endpoint:
     gateway:
       access: unrestricted
+  health:
+    diskspace:
+      # Skip disk-space check — dev laptops dip below the 10MB threshold and
+      # trip Eureka into marking the gateway DOWN even when it is operational.
+      enabled: false

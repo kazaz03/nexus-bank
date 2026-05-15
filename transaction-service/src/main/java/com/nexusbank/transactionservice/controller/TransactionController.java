@@ -15,6 +15,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -34,17 +35,20 @@ public class TransactionController {
     }
 
     @PostMapping("/transactions/transfer")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
     public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request) {
         TransferResponse response = transferService.transfer(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/transactions/{id}")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
     public ResponseEntity<TransactionResponse> getTransaction(@PathVariable Long id) {
         return ResponseEntity.ok(transactionService.getTransaction(id));
     }
 
     @GetMapping("/transactions/account/{accountId}")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
     public ResponseEntity<Page<TransactionResponse>> getTransactionHistory(
             @PathVariable Long accountId,
             @RequestParam(required = false) String type,
@@ -58,6 +62,7 @@ public class TransactionController {
     }
 
     @GetMapping("/accounts/{accountId}/statement")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
     public ResponseEntity<StatementResponse> getStatement(
             @PathVariable Long accountId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
@@ -66,6 +71,7 @@ public class TransactionController {
     }
 
     @GetMapping("/exchange-rates")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN', 'LOAN_OFFICER')")
     public ResponseEntity<List<ExchangeRateResponse>> getExchangeRates() {
         return ResponseEntity.ok(transactionService.getCurrentExchangeRates());
     }

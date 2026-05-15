@@ -61,7 +61,8 @@ public class LoanApplication {
 
     public enum LoanStatus {
         PENDING,
-        APPROVED,
+        APPROVED,   // intermediate state after officer approval; disbursement event published
+        DISBURSED,  // final state once account-service confirmed crediting the funds
         REJECTED
     }
 }

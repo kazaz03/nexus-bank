@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -27,6 +28,7 @@ public class LoanController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
     public ResponseEntity<LoanApplicationResponse> submitApplication(
             @Valid @RequestBody LoanApplicationRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -34,6 +36,7 @@ public class LoanController {
     }
 
     @PostMapping("/batch")
+    @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
     public ResponseEntity<List<LoanApplicationResponse>> submitApplicationsBatch(
             @Valid @RequestBody List<@Valid LoanApplicationRequest> requests) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -41,6 +44,7 @@ public class LoanController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('LOAN_OFFICER', 'ADMIN')")
     public ResponseEntity<Page<LoanApplicationResponse>> getAllApplications(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -62,11 +66,13 @@ public class LoanController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'LOAN_OFFICER', 'TELLER', 'ADMIN')")
     public ResponseEntity<LoanApplicationResponse> getApplication(@PathVariable Long id) {
         return ResponseEntity.ok(loanService.getApplication(id));
     }
 
     @PatchMapping(path = "/{id}", consumes = "application/json-patch+json")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
     public ResponseEntity<LoanApplicationResponse> patchApplication(
             @PathVariable Long id,
             @RequestBody JsonPatch patch) {
@@ -74,12 +80,14 @@ public class LoanController {
     }
 
     @GetMapping("/customer/{customerId}")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'LOAN_OFFICER', 'TELLER', 'ADMIN')")
     public ResponseEntity<List<LoanApplicationResponse>> getApplicationsByCustomer(
             @PathVariable Long customerId) {
         return ResponseEntity.ok(loanService.getApplicationsByCustomer(customerId));
     }
 
     @PostMapping("/{id}/review")
+    @PreAuthorize("hasAnyRole('LOAN_OFFICER', 'ADMIN')")
     public ResponseEntity<LoanApplicationResponse> reviewApplication(
             @PathVariable Long id,
             @Valid @RequestBody LoanReviewRequest request) {
@@ -87,6 +95,7 @@ public class LoanController {
     }
 
     @GetMapping("/{id}/schedule")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'LOAN_OFFICER', 'TELLER', 'ADMIN')")
     public ResponseEntity<List<RepaymentScheduleResponse>> getRepaymentSchedule(@PathVariable Long id) {
         return ResponseEntity.ok(loanService.getRepaymentSchedule(id));
     }

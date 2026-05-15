@@ -1,0 +1,64 @@
+<header class="topbar">
+  <h1>Nexus Bank</h1>
+  <div class="user">
+    <span>{{ email }} · <strong>{{ role }}</strong></span>
+    <button (click)="logout()">Logout</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+  <a routerLink="/loans" routerLinkActive="active">Loan queue</a>
+</nav>
+
+<main>
+  <section>
+    <div class="row">
+      <h2>Loan applications</h2>
+      <button (click)="load()">Refresh</button>
+    </div>
+
+    @if (message()) {
+      <p class="info">{{ message() }}</p>
+    }
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    @if (loading()) {
+      <p>Loading…</p>
+    } @else {
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Customer</th><th>Account</th>
+            <th>Requested</th><th>Term</th><th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (l of loans(); track l.id) {
+            <tr>
+              <td>{{ l.id }}</td>
+              <td>{{ l.customerId }}</td>
+              <td>{{ l.accountId }}</td>
+              <td>{{ l.amountRequested }} BAM</td>
+              <td>{{ l.termMonths }} mo</td>
+              <td>
+                <span class="badge badge-{{ l.status.toLowerCase() }}">{{ l.status }}</span>
+              </td>
+              <td>
+                @if (l.status === 'PENDING') {
+                  <button class="approve" (click)="approve(l)">Approve</button>
+                  <button class="reject" (click)="reject(l)">Reject</button>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </section>
+</main>
