@@ -32,3 +32,7 @@ hs_err_pid*
 replay_pid*
 
 .claude/
+
+# RSA / PEM keys — never commit private or public keys
+*.pem
+**/keys/
