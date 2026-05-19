@@ -16,6 +16,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Date;
+import java.util.UUID;
 
 /**
  * Handles JWT generation and validation using RS256 (RSA + SHA-256).
@@ -48,6 +49,7 @@ public class JwtUtil {
 
     public String generateToken(User user) {
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(user.getEmail())
                 .claim("role", user.getRole().name())
                 .claim("userId", user.getId())
@@ -55,6 +57,10 @@ public class JwtUtil {
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(privateKey)
                 .compact();
+    }
+
+    public String extractJti(String token) {
+        return extractAllClaims(token).getId();
     }
 
     public Claims extractAllClaims(String token) {

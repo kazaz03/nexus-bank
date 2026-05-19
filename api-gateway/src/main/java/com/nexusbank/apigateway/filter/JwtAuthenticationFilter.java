@@ -1,5 +1,6 @@
 package com.nexusbank.apigateway.filter;
 
+import com.nexusbank.apigateway.client.TokenRevocationClient;
 import com.nexusbank.apigateway.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -63,9 +64,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     );
 
     private final RSAPublicKey publicKey;
+    private final TokenRevocationClient tokenRevocationClient;
 
-    public JwtAuthenticationFilter(JwtProperties jwtProperties) {
+    public JwtAuthenticationFilter(JwtProperties jwtProperties,
+                                   TokenRevocationClient tokenRevocationClient) {
         this.publicKey = loadPublicKey(jwtProperties.getPublicKeyPath());
+        this.tokenRevocationClient = tokenRevocationClient;
     }
 
     @Override
@@ -95,21 +99,31 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         String token = authHeader.substring(7);
 
+        Claims claims;
         try {
-            Claims claims = parseToken(token);
-
-            ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                    .header("X-User-Id",    String.valueOf(claims.get("userId")))
-                    .header("X-User-Email", claims.getSubject())
-                    .header("X-User-Role",  claims.get("role", String.class))
-                    .build();
-
-            return chain.filter(exchange.mutate().request(mutatedRequest).build());
-
+            claims = parseToken(token);
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("JWT validation failed for path {}: {}", path, e.getMessage());
             return reject(exchange, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
         }
+
+        String jti = claims.getId();
+
+        return tokenRevocationClient.isRevoked(jti)
+                .flatMap(revoked -> {
+                    if (revoked) {
+                        log.warn("Revoked token used for path {}, jti={}", path, jti);
+                        return reject(exchange, HttpStatus.UNAUTHORIZED, "Token has been revoked");
+                    }
+
+                    ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                            .header("X-User-Id",    String.valueOf(claims.get("userId")))
+                            .header("X-User-Email", claims.getSubject())
+                            .header("X-User-Role",  claims.get("role", String.class))
+                            .build();
+
+                    return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                });
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

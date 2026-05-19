@@ -1,13 +1,16 @@
 package com.nexusbank.apigateway.filter;
 
+import com.nexusbank.apigateway.client.TokenRevocationClient;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
@@ -15,6 +18,9 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 import java.util.Date;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for JwtAuthenticationFilter.
@@ -41,14 +47,32 @@ class JwtAuthenticationFilterTest {
     @Autowired
     private WebTestClient webTestClient;
 
+    @MockBean
+    private TokenRevocationClient tokenRevocationClient;
+
     private String validToken;
     private String expiredToken;
+    private String revokedToken;
+
+    private static final String VALID_JTI   = "valid-jti-001";
+    private static final String REVOKED_JTI = "revoked-jti-002";
 
     @BeforeEach
     void setUp() throws Exception {
         RSAPrivateKey privateKey = loadTestPrivateKey();
 
         validToken = Jwts.builder()
+                .id(VALID_JTI)
+                .subject("admin@nexusbank.com")
+                .claim("role", "ADMIN")
+                .claim("userId", 1L)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 86_400_000))
+                .signWith(privateKey)
+                .compact();
+
+        revokedToken = Jwts.builder()
+                .id(REVOKED_JTI)
                 .subject("admin@nexusbank.com")
                 .claim("role", "ADMIN")
                 .claim("userId", 1L)
@@ -58,6 +82,7 @@ class JwtAuthenticationFilterTest {
                 .compact();
 
         expiredToken = Jwts.builder()
+                .id("expired-jti-003")
                 .subject("admin@nexusbank.com")
                 .claim("role", "ADMIN")
                 .claim("userId", 1L)
@@ -65,6 +90,11 @@ class JwtAuthenticationFilterTest {
                 .expiration(new Date(System.currentTimeMillis() - 100_000))
                 .signWith(privateKey)
                 .compact();
+
+        // Default: no token is revoked
+        when(tokenRevocationClient.isRevoked(any())).thenReturn(Mono.just(false));
+        // Mark the specific revoked JTI
+        when(tokenRevocationClient.isRevoked(REVOKED_JTI)).thenReturn(Mono.just(true));
     }
 
     // ── public paths ─────────────────────────────────────────────────────────
@@ -124,6 +154,17 @@ class JwtAuthenticationFilterTest {
         webTestClient.get()
                 .uri("/api/loans")
                 .header("Authorization", "Bearer this.is.not.a.jwt")
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    // ── protected paths — revoked token ──────────────────────────────────────
+
+    @Test
+    void protectedPath_withRevokedToken_returns401() {
+        webTestClient.get()
+                .uri("/api/customers")
+                .header("Authorization", "Bearer " + revokedToken)
                 .exchange()
                 .expectStatus().isUnauthorized();
     }

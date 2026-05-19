@@ -16,16 +16,19 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final TokenRevocationService tokenRevocationService;
 
     @Value("${jwt.expiration}")
     private long expiration;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtUtil jwtUtil) {
+                       JwtUtil jwtUtil,
+                       TokenRevocationService tokenRevocationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.tokenRevocationService = tokenRevocationService;
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -42,5 +45,13 @@ public class AuthService {
 
         String token = jwtUtil.generateToken(user);
         return new LoginResponse(token, user.getId(), user.getEmail(), user.getRole().name(), expiration);
+    }
+
+    public void logout(String token) {
+        try {
+            tokenRevocationService.revokeToken(token);
+        } catch (Exception ignored) {
+            // Token was already invalid or expired — nothing to revoke
+        }
     }
 }
