@@ -46,7 +46,8 @@ class TokenRevocationServiceTest {
 
     @Test
     void revokeToken_whenAlreadyRevoked_doesNotSaveAgain() {
-        Claims claims = mockClaims("test-jti", 1L, new Date(System.currentTimeMillis() + 86_400_000));
+        Claims claims = mock(Claims.class);
+        when(claims.getId()).thenReturn("test-jti");
         when(jwtUtil.extractAllClaims("token")).thenReturn(claims);
         when(revokedTokenRepository.existsByJti("test-jti")).thenReturn(true);
 
