@@ -196,6 +196,66 @@ class UserAuthIntegrationTest {
                 });
     }
 
+    // ── Logout + token revocation ─────────────────────────────────────────────
+
+    @Test
+    void logout_invalidatesToken_subsequentRequestIs4xx() {
+        // 1. Login and obtain a valid JWT
+        LoginResponse login = restTemplate.postForEntity(
+                "/api/auth/login",
+                loginRequest(TELLER_EMAIL, TELLER_PASSWORD),
+                LoginResponse.class).getBody();
+        assertThat(login).isNotNull();
+        String jwt = login.getToken();
+
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setBearerAuth(jwt);
+
+        // 2. Logout — revoke the token
+        ResponseEntity<Void> logoutResp = restTemplate.exchange(
+                "/api/auth/logout",
+                org.springframework.http.HttpMethod.POST,
+                new org.springframework.http.HttpEntity<>(headers),
+                Void.class);
+        assertThat(logoutResp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        // 3. The revoked token must no longer grant access to protected endpoints
+        ResponseEntity<String> afterLogout = restTemplate.exchange(
+                "/api/customers",
+                org.springframework.http.HttpMethod.GET,
+                new org.springframework.http.HttpEntity<>(headers),
+                String.class);
+        assertThat(afterLogout.getStatusCode().is4xxClientError()).isTrue();
+    }
+
+    @Test
+    void logout_withNoToken_returns204WithoutError() {
+        ResponseEntity<Void> response = restTemplate.postForEntity(
+                "/api/auth/logout", null, Void.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    @Test
+    void logout_calledTwiceWithSameToken_returns204BothTimes() {
+        LoginResponse login = restTemplate.postForEntity(
+                "/api/auth/login",
+                loginRequest(ADMIN_EMAIL, ADMIN_PASSWORD),
+                LoginResponse.class).getBody();
+        assertThat(login).isNotNull();
+
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setBearerAuth(login.getToken());
+        var entity = new org.springframework.http.HttpEntity<Void>(headers);
+
+        assertThat(restTemplate.exchange("/api/auth/logout",
+                org.springframework.http.HttpMethod.POST, entity, Void.class)
+                .getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        assertThat(restTemplate.exchange("/api/auth/logout",
+                org.springframework.http.HttpMethod.POST, entity, Void.class)
+                .getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private LoginRequest loginRequest(String email, String password) {

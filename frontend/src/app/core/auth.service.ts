@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { catchError, EMPTY, Observable, tap } from 'rxjs';
 
 export interface LoginResponse {
   token: string;
@@ -35,6 +35,12 @@ export class AuthService {
   }
 
   logout(): void {
+    // Tell the server to revoke the token before clearing local state.
+    // Fire-and-forget: local storage is cleared regardless of the response.
+    this.http.post(`${this.apiBase}/api/auth/logout`, null)
+      .pipe(catchError(() => EMPTY))
+      .subscribe();
+
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ROLE_KEY);
     localStorage.removeItem(EMAIL_KEY);
