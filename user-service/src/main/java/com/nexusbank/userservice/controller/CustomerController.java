@@ -41,6 +41,14 @@ public class CustomerController {
         return ResponseEntity.ok(customerService.getAllCustomers());
     }
 
+    //Returns the Customer profile of the currently authenticated user.
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<CustomerResponse> getMyProfile(
+            @RequestHeader("X-User-Id") Long userId) {
+        return ResponseEntity.ok(customerService.getCustomerByUserId(userId));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
     public ResponseEntity<CustomerResponse> getCustomer(@PathVariable Long id) {
