@@ -48,3 +48,14 @@ h2 { margin: 0 0 16px; font-size: 18px; }
 table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 6px; overflow: hidden; }
 th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #334155; }
 th { background: #0f172a; font-size: 12px; text-transform: uppercase; color: #94a3b8; }
+
+button.view {
+  padding: 5px 12px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+button.view:hover { background: #1d4ed8; }

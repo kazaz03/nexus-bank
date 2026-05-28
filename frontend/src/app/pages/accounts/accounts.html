@@ -7,9 +7,10 @@
 </header>
 
 <nav class="tabs">
-  <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
-  <a routerLink="/accounts"  routerLinkActive="active">Accounts</a>
-  <a routerLink="/transfer"  routerLinkActive="active">Transfer</a>
+  <a routerLink="/dashboard"  routerLinkActive="active">Dashboard</a>
+  <a routerLink="/accounts"   routerLinkActive="active">Accounts</a>
+  <a routerLink="/transfer"   routerLinkActive="active">Transfer</a>
+  <a routerLink="/apply-loan" routerLinkActive="active">Apply for Loan</a>
 </nav>
 
 <main>
@@ -32,6 +33,7 @@
             <th>Balance</th>
             <th>Overdraft</th>
             <th>Status</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -49,6 +51,9 @@
                 }
               </td>
               <td>{{ a.status }}</td>
+              <td>
+                <button class="view" (click)="viewTransactions(a.id)">Transactions</button>
+              </td>
             </tr>
           }
         </tbody>

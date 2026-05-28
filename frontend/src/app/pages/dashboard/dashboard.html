@@ -9,8 +9,9 @@
 <nav class="tabs">
   <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
   @if (role === 'CUSTOMER') {
-    <a routerLink="/accounts" routerLinkActive="active">Accounts</a>
-    <a routerLink="/transfer" routerLinkActive="active">Transfer</a>
+    <a routerLink="/accounts"   routerLinkActive="active">Accounts</a>
+    <a routerLink="/transfer"   routerLinkActive="active">Transfer</a>
+    <a routerLink="/apply-loan" routerLinkActive="active">Apply for Loan</a>
   }
   @if (role === 'LOAN_OFFICER' || role === 'ADMIN') {
     <a routerLink="/loans" routerLinkActive="active">Loan queue</a>

@@ -63,6 +63,11 @@ export class AccountsComponent implements OnInit {
   formatAmount(value: number, currency: string): string {
     return `${value.toFixed(2)} ${currency}`;
   }
+  
+  viewTransactions(accountId: number): void {
+    this.router.navigate(['/transactions', accountId]);
+  }
+
 
   logout(): void {
     this.auth.logout();
