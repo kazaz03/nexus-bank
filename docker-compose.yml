@@ -1,0 +1,331 @@
+name: nexus-bank
+
+networks:
+  nexus-network:
+    driver: bridge
+
+volumes:
+  mysql-user-data:
+  mysql-account-data:
+  mysql-transaction-data:
+  mysql-loan-data:
+  rabbitmq-data:
+
+services:
+
+  # ─── Message Broker ───────────────────────────────────────────────────────
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: nexus-rabbitmq
+    networks: [nexus-network]
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # ─── Databases ────────────────────────────────────────────────────────────
+
+  mysql-user:
+    image: mysql:8.0
+    container_name: nexus-mysql-user
+    networks: [nexus-network]
+    ports:
+      - "3310:3306"
+    volumes:
+      - mysql-user-data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: user_service_db
+      MYSQL_USER: nexus
+      MYSQL_PASSWORD: nexus123
+      MYSQL_ROOT_PASSWORD: root123
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-unexus", "-pnexus123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  mysql-account:
+    image: mysql:8.0
+    container_name: nexus-mysql-account
+    networks: [nexus-network]
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-account-data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: account_service_db
+      MYSQL_USER: nexus
+      MYSQL_PASSWORD: nexus123
+      MYSQL_ROOT_PASSWORD: root123
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-unexus", "-pnexus123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  mysql-transaction:
+    image: mysql:8.0
+    container_name: nexus-mysql-transaction
+    networks: [nexus-network]
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql-transaction-data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: transaction_service_db
+      MYSQL_USER: nexus
+      MYSQL_PASSWORD: nexus123
+      MYSQL_ROOT_PASSWORD: root123
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-unexus", "-pnexus123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  mysql-loan:
+    image: mysql:8.0
+    container_name: nexus-mysql-loan
+    networks: [nexus-network]
+    ports:
+      - "3309:3306"
+    volumes:
+      - mysql-loan-data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: loan_service_db
+      MYSQL_USER: nexus
+      MYSQL_PASSWORD: nexus123
+      MYSQL_ROOT_PASSWORD: root123
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-unexus", "-pnexus123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # ─── Service Discovery ────────────────────────────────────────────────────
+
+  discovery-server:
+    build:
+      context: ./discovery-server
+    container_name: nexus-discovery
+    networks: [nexus-network]
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # ─── Backend Microservices ────────────────────────────────────────────────
+
+  user-service:
+    build:
+      context: ./user-service
+    container_name: nexus-user-service
+    networks: [nexus-network]
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-user:3306/user_service_db
+      SPRING_DATASOURCE_USERNAME: nexus
+      SPRING_DATASOURCE_PASSWORD: nexus123
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+    depends_on:
+      mysql-user:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  account-service:
+    build:
+      context: ./account-service
+    container_name: nexus-account-service
+    networks: [nexus-network]
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-account:3306/account_service_db
+      SPRING_DATASOURCE_USERNAME: nexus
+      SPRING_DATASOURCE_PASSWORD: nexus123
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka
+      RABBITMQ_HOST: rabbitmq
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+    depends_on:
+      mysql-account:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  transaction-service:
+    build:
+      context: ./transaction-service
+    container_name: nexus-transaction-service
+    networks: [nexus-network]
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-transaction:3306/transaction_service_db
+      SPRING_DATASOURCE_USERNAME: nexus
+      SPRING_DATASOURCE_PASSWORD: nexus123
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka
+      ACCOUNT_SERVICE_DIRECT_URL: http://account-service:8082
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+    depends_on:
+      mysql-transaction:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  loan-service:
+    build:
+      context: ./loan-service
+    container_name: nexus-loan-service
+    networks: [nexus-network]
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-loan:3306/loan_service_db
+      SPRING_DATASOURCE_USERNAME: nexus
+      SPRING_DATASOURCE_PASSWORD: nexus123
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka
+      RABBITMQ_HOST: rabbitmq
+      ACCOUNT_SERVICE_DIRECT_URL: http://account-service:8082
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+    depends_on:
+      mysql-loan:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # ─── API Gateway ──────────────────────────────────────────────────────────
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    container_name: nexus-api-gateway
+    networks: [nexus-network]
+    ports:
+      - "8080:8080"
+    environment:
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka
+      USER_SERVICE_URL: http://user-service:8081
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # ─── Frontend ─────────────────────────────────────────────────────────────
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: nexus-frontend
+    networks: [nexus-network]
+    ports:
+      - "4200:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 64m
