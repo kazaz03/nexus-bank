@@ -1,0 +1,89 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  <section>
+    <div class="row">
+      <div>
+        <h2>Transaction history</h2>
+        <p class="muted">Account #{{ accountId }}
+          @if (transactions().length > 0) {
+            · {{ transactions().length }} of {{ total() }} shown
+          }
+        </p>
+      </div>
+      <a routerLink="/accounts" class="back">← Back to accounts</a>
+    </div>
+
+    <div class="filters">
+      <label>
+        Type
+        <select name="filterType" [(ngModel)]="filterType">
+          <option value="">All</option>
+          <option value="TRANSFER">Transfer</option>
+          <option value="DEPOSIT">Deposit</option>
+          <option value="WITHDRAWAL">Withdrawal</option>
+          <option value="FX_CONVERSION">FX Conversion</option>
+        </select>
+      </label>
+      <label>
+        From
+        <input type="date" name="filterFrom" [(ngModel)]="filterFrom" />
+      </label>
+      <label>
+        To
+        <input type="date" name="filterTo" [(ngModel)]="filterTo" />
+      </label>
+      <button class="apply-btn" (click)="applyFilters()" [disabled]="loading()">Apply</button>
+    </div>
+
+    @if (loading() && transactions().length === 0) {
+      <p>Loading…</p>
+    } @else if (error()) {
+      <p class="error">{{ error() }}</p>
+    } @else if (transactions().length === 0) {
+      <p class="muted">No transactions found for this account.</p>
+    } @else {
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Amount</th>
+              <th>Balance after</th>
+              <th>Counterparty IBAN</th>
+              <th>Reference</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of transactions(); track t.id) {
+              <tr>
+                <td class="nowrap">{{ formatDate(t.createdAt) }}</td>
+                <td>
+                  <span class="badge badge-{{ t.type.toLowerCase() }}">{{ t.type }}</span>
+                </td>
+                <td>{{ formatAmount(t.amount, t.currency) }}</td>
+                <td>{{ formatAmount(t.balanceAfter, t.currency) }}</td>
+                <td class="iban">{{ t.counterpartyIban ?? '—' }}</td>
+                <td>{{ t.reference ?? '—' }}</td>
+                <td>{{ t.status }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (loading()) {
+        <p class="loading-more">Loading…</p>
+      }
+
+      @if (hasMore() && !loading()) {
+        <div class="load-more">
+          <button (click)="loadMore()">Load more</button>
+        </div>
+      }
+    }
+  </section>
+</main>

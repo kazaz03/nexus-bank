@@ -1,1 +1,80 @@
-/* You can add global styles to this file, and also import other style files */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  font-size: 1rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  line-height: 1.5;
+}
+
+/* ── Typography ──────────────────────────────── */
+h2 {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+/* ── Layout ──────────────────────────────────── */
+main {
+  padding: 1.5rem;
+}
+
+/* ── Utility classes ─────────────────────────── */
+.muted {
+  color: #94a3b8;
+}
+
+.error {
+  color: #f87171;
+}
+
+/* ── Table base styles ───────────────────────── */
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 6px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #1e293b;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+th,
+td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #334155;
+  font-size: 0.9375rem;
+}
+
+th {
+  background: #0f172a;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 768px) {
+  th,
+  td {
+    padding: 0.5rem 0.625rem;
+    font-size: 0.875rem;
+  }
+
+  th {
+    font-size: 0.6875rem;
+  }
+}

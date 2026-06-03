@@ -1,0 +1,43 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  @if (role === 'TELLER' || role === 'ADMIN') {
+    <section>
+      <h2>Customers</h2>
+      @if (loading()) {
+        <p>Loading…</p>
+      } @else if (error()) {
+        <p class="error">{{ error() }}</p>
+      } @else {
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>KYC</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of customers(); track c.id) {
+                <tr>
+                  <td>{{ c.id }}</td>
+                  <td>{{ c.firstName }} {{ c.lastName }}</td>
+                  <td>{{ c.email }}</td>
+                  <td>{{ c.kycStatus }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  } @else {
+    <section>
+      <h2>Welcome, {{ email }}</h2>
+      <p class="muted">You are signed in as <strong>{{ role }}</strong>.</p>
+    </section>
+  }
+</main>

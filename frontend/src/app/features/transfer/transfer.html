@@ -1,0 +1,66 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  <section class="form-card">
+    <h2>New transfer</h2>
+
+    <form (ngSubmit)="submit()" #f="ngForm">
+      <label>
+        From account
+        <select name="sourceIban" [(ngModel)]="sourceIban" required>
+          @for (a of myAccounts(); track a.id) {
+            <option [value]="a.iban">
+              {{ a.accountType }} · {{ a.iban }} ({{ a.balance.toFixed(2) }} {{ a.currency }})
+            </option>
+          }
+        </select>
+      </label>
+
+      <label>
+        Recipient IBAN
+        <input type="text" name="targetIban" [(ngModel)]="targetIban" required
+               placeholder="BA39…" />
+      </label>
+
+      <label>
+        Amount
+        <input type="number" name="amount" [(ngModel)]="amount" required min="0.01" step="0.01" />
+      </label>
+
+      <label>
+        Reference (optional)
+        <input type="text" name="reference" [(ngModel)]="reference"
+               placeholder="e.g. Rent March 2026" />
+      </label>
+
+      <button type="submit" [disabled]="submitting()">
+        @if (submitting()) { Sending… } @else { Confirm transfer }
+      </button>
+    </form>
+
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    @if (result(); as r) {
+      <div class="success">
+        <h3>Transfer completed</h3>
+        <dl>
+          <dt>Reference</dt><dd>{{ r.reference }}</dd>
+          <dt>From</dt><dd>{{ r.sourceIban }}</dd>
+          <dt>To</dt><dd>{{ r.targetIban }}</dd>
+          <dt>Amount sent</dt><dd>{{ r.sourceAmount.toFixed(2) }} {{ r.sourceCurrency }}</dd>
+          @if (r.exchangeRate) {
+            <dt>Exchange rate</dt>
+            <dd>{{ r.exchangeRate }} ({{ r.sourceCurrency }} → {{ r.targetCurrency }})</dd>
+            <dt>Amount received</dt>
+            <dd>{{ r.targetAmount.toFixed(2) }} {{ r.targetCurrency }}</dd>
+          }
+          <dt>New source balance</dt><dd>{{ r.sourceBalanceAfter.toFixed(2) }} {{ r.sourceCurrency }}</dd>
+          <dt>Status</dt><dd>{{ r.status }}</dd>
+        </dl>
+      </div>
+    }
+  </section>
+</main>
