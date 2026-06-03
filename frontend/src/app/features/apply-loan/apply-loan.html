@@ -1,0 +1,62 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  <section class="form-card">
+    <h2>Apply for a loan</h2>
+
+    @if (myAccounts().length === 0 && !error()) {
+      <p class="muted">Loading your accounts…</p>
+    } @else if (myAccounts().length === 0 && error()) {
+      <p class="error">{{ error() }}</p>
+    } @else {
+      <form (ngSubmit)="submit()" #f="ngForm">
+        <label>
+          Disbursement account
+          <select name="selectedAccountId" [(ngModel)]="selectedAccountId" required>
+            @for (a of myAccounts(); track a.id) {
+              <option [value]="a.id">
+                {{ a.accountType }} · {{ a.iban }} ({{ a.balance.toFixed(2) }} {{ a.currency }})
+              </option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Amount requested
+          <input type="number" name="amountRequested" [(ngModel)]="amountRequested"
+                 required min="100" step="0.01" placeholder="Min. 100.00" />
+        </label>
+
+        <label>
+          Currency
+          <select name="currency" [(ngModel)]="currency">
+            <option value="BAM">BAM</option>
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+          </select>
+        </label>
+
+        <label>
+          Term (months)
+          <input type="number" name="termMonths" [(ngModel)]="termMonths"
+                 required min="1" step="1" placeholder="e.g. 12" />
+        </label>
+
+        <label>
+          Purpose
+          <input type="text" name="purpose" [(ngModel)]="purpose"
+                 required placeholder="e.g. Home renovation" />
+        </label>
+
+        <button type="submit" [disabled]="submitting()">
+          @if (submitting()) { Submitting… } @else { Submit application }
+        </button>
+      </form>
+
+      @if (error()) {
+        <p class="error">{{ error() }}</p>
+      }
+    }
+  </section>
+</main>

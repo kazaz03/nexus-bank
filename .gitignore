@@ -1,4 +1,5 @@
 .idea/
+.vscode/
 
 # Maven build output
 target/
@@ -32,6 +33,8 @@ hs_err_pid*
 replay_pid*
 
 .claude/
+.cursor/
+graphify-out/
 
 # RSA / PEM keys — never commit private or public keys
 *.pem

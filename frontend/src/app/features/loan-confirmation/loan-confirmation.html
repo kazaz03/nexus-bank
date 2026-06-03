@@ -1,0 +1,45 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  @if (loan(); as l) {
+    <div class="confirmation-card">
+
+      <div class="success-icon" aria-hidden="true">✓</div>
+      <h2>Application Submitted</h2>
+      <p class="subtitle">Your application is under review. You will be notified of the decision.</p>
+
+      <div class="ref-pill">Application #{{ l.id }}</div>
+
+      <div class="stats-grid">
+        <div class="stat">
+          <span class="stat-label">Amount requested</span>
+          <span class="stat-value">{{ formatAmount(l.amountRequested, l.currency) }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Term</span>
+          <span class="stat-value">{{ l.termMonths }} months</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Disbursement account</span>
+          <span class="stat-value">#{{ l.accountId }}</span>
+        </div>
+      </div>
+
+      <div class="purpose-block">
+        <span class="stat-label">Purpose</span>
+        <p class="purpose-text">{{ l.purpose }}</p>
+      </div>
+
+      <div class="status-row">
+        <span class="badge badge-{{ l.status.toLowerCase() }}">{{ l.status }}</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" routerLink="/apply-loan">Apply for another loan</button>
+        <button class="btn-secondary" routerLink="/dashboard">Go to dashboard</button>
+      </div>
+
+    </div>
+  }
+</main>

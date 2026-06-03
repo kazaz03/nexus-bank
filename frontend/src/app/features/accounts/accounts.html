@@ -1,0 +1,53 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  <section>
+    <h2>My accounts</h2>
+
+    @if (loading()) {
+      <p>Loading…</p>
+    } @else if (error()) {
+      <p class="error">{{ error() }}</p>
+    } @else if (accounts().length === 0) {
+      <p class="muted">You don't have any accounts yet.</p>
+    } @else {
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>IBAN</th>
+              <th>Type</th>
+              <th>Currency</th>
+              <th>Balance</th>
+              <th>Overdraft</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of accounts(); track a.id) {
+              <tr>
+                <td>{{ a.iban }}</td>
+                <td>{{ a.accountType }}</td>
+                <td>{{ a.currency }}</td>
+                <td>{{ formatAmount(a.balance, a.currency) }}</td>
+                <td>
+                  @if (a.overdraftLimit && a.overdraftLimit > 0) {
+                    {{ formatAmount(a.overdraftLimit, a.currency) }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>{{ a.status }}</td>
+                <td>
+                  <button class="btn-view" (click)="viewTransactions(a.id)">Transactions</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</main>
