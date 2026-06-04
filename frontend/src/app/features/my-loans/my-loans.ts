@@ -7,12 +7,12 @@ import { TopbarComponent } from '../../shared/components/topbar/topbar';
 import { NavTabsComponent } from '../../shared/components/nav-tabs/nav-tabs';
 
 @Component({
-  selector: 'app-loans',
+  selector: 'app-my-loans',
   imports: [TopbarComponent, NavTabsComponent],
-  templateUrl: './loans.html',
-  styleUrl: './loans.css'
+  templateUrl: './my-loans.html',
+  styleUrl: './my-loans.css'
 })
-export class LoansComponent implements OnInit {
+export class MyLoansComponent implements OnInit {
   private auth = inject(AuthService);
   private loanService = inject(LoanService);
   private router = inject(Router);
@@ -34,46 +34,20 @@ export class LoansComponent implements OnInit {
   }
 
   load(): void {
+    const customerId = this.auth.getCustomerId();
+    if (!customerId) return;
+
     this.loading.set(true);
     this.error.set(null);
-    this.loanService.getAll().subscribe({
+    this.loanService.getByCustomer(+customerId).subscribe({
       next: data => {
-        this.loans.set(data.content);
+        this.loans.set(data);
         this.loading.set(false);
       },
       error: err => {
         this.loading.set(false);
         this.error.set(err?.status ? `Failed (HTTP ${err.status})` : 'Failed to load loans');
       }
-    });
-  }
-
-  approve(loan: Loan): void {
-    const body = {
-      approved: true,
-      amountApproved: loan.amountRequested,
-      interestRate: 6.5,
-      reviewedBy: 3
-    };
-    this.loanService.review(loan.id, body).subscribe({
-      next: () => {
-        this.loans.update(list =>
-          list.map(l => l.id === loan.id ? { ...l, status: 'APPROVED' } : l)
-        );
-      },
-      error: err => this.error.set(err?.error?.message || 'Approval failed')
-    });
-  }
-
-  reject(loan: Loan): void {
-    const body = { approved: false, rejectionReason: 'Rejected by officer', reviewedBy: 3 };
-    this.loanService.review(loan.id, body).subscribe({
-      next: () => {
-        this.loans.update(list =>
-          list.map(l => l.id === loan.id ? { ...l, status: 'REJECTED' } : l)
-        );
-      },
-      error: err => this.error.set(err?.error?.message || 'Rejection failed')
     });
   }
 
@@ -101,6 +75,12 @@ export class LoansComponent implements OnInit {
         }
       });
     }
+  }
+
+  remainingBalance(loan: Loan): number {
+    return this.schedule()
+      .filter(s => s.status !== 'PAID')
+      .reduce((sum, s) => sum + s.amountDue, 0);
   }
 
   formatDate(dateStr: string | null): string {
