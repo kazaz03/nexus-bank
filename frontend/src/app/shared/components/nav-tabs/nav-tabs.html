@@ -3,8 +3,10 @@
 
   @if (role === 'CUSTOMER') {
     <a routerLink="/accounts" routerLinkActive="active">Accounts</a>
+    <a routerLink="/cards" routerLinkActive="active">Cards</a>
     <a routerLink="/transfer" routerLinkActive="active">Transfer</a>
     <a routerLink="/apply-loan" routerLinkActive="active">Apply for Loan</a>
+    <a routerLink="/profile" routerLinkActive="active">Profile</a>
   }
 
   @if (role === 'LOAN_OFFICER' || role === 'ADMIN') {

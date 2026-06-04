@@ -3,6 +3,71 @@
 
 <main>
   @if (role === 'TELLER' || role === 'ADMIN') {
+
+    <!-- Issue Card panel -->
+    <section class="panel">
+      <div class="panel-header" (click)="toggleIssueForm()">
+        <h2>Issue debit card</h2>
+        <span class="toggle-icon">{{ showIssueForm() ? '▲' : '▼' }}</span>
+      </div>
+
+      @if (showIssueForm()) {
+        <div class="panel-body">
+          <div class="issue-form">
+            <label>
+              Customer
+              <select name="customerId" [(ngModel)]="selectedCustomerId"
+                      (ngModelChange)="onCustomerChange()">
+                @for (c of customers(); track c.id) {
+                  <option [value]="c.id">
+                    {{ c.firstName }} {{ c.lastName }} ({{ c.email }})
+                  </option>
+                }
+              </select>
+            </label>
+
+            <label>
+              Account
+              @if (accountsLoading()) {
+                <select disabled><option>Loading…</option></select>
+              } @else if (customerAccounts().length === 0) {
+                <select disabled><option>No accounts found</option></select>
+              } @else {
+                <select name="accountId" [(ngModel)]="selectedAccountId">
+                  @for (a of customerAccounts(); track a.id) {
+                    <option [value]="a.id">
+                      {{ a.accountType }} · {{ a.iban }} ({{ a.balance.toFixed(2) }} {{ a.currency }})
+                    </option>
+                  }
+                </select>
+              }
+            </label>
+
+            <button class="btn-issue" (click)="issueCard()"
+                    [disabled]="issuing() || !selectedAccountId">
+              @if (issuing()) { Issuing… } @else { Issue card }
+            </button>
+          </div>
+
+          @if (issueError()) {
+            <p class="error">{{ issueError() }}</p>
+          }
+
+          @if (issuedCard(); as card) {
+            <div class="success">
+              <strong>Card issued successfully</strong>
+              <dl>
+                <dt>Card number</dt><dd>{{ card.maskedCardNumber }}</dd>
+                <dt>Expires</dt><dd>{{ card.expiryDate }}</dd>
+                <dt>Status</dt><dd>{{ card.status }}</dd>
+              </dl>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Customers table -->
     <section>
       <h2>Customers</h2>
       @if (loading()) {
@@ -34,6 +99,7 @@
         </div>
       }
     </section>
+
   } @else {
     <section>
       <h2>Welcome, {{ email }}</h2>

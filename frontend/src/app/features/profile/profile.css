@@ -1,0 +1,135 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.form-card {
+  max-width: 500px;
+  background: #1e293b;
+  padding: 1.5rem;
+  border-radius: 6px;
+}
+
+.success-msg {
+  color: #86efac;
+  margin: 0 0 1rem;
+}
+
+/* ── Read-only view ──────────────────────────── */
+.profile-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1.25rem;
+  margin: 0 0 1.5rem;
+}
+
+.profile-dl dt {
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.profile-dl dd {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.badge {
+  padding: 0.1875rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-verified { background: #16a34a; color: #fff; }
+.badge-pending  { background: #ca8a04; color: #fff; }
+.badge-rejected { background: #dc2626; color: #fff; }
+
+/* ── Edit form ───────────────────────────────── */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+input {
+  padding: 0.5rem 0.625rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 1rem;
+}
+
+input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+/* ── Buttons ─────────────────────────────────── */
+.btn-primary {
+  padding: 0.5rem 1.25rem;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.btn-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.btn-row button[type='submit'] {
+  padding: 0.625rem 1.25rem;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  transition: background 0.15s;
+}
+
+.btn-row button[type='submit']:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btn-row button[type='submit']:disabled {
+  background: #334155;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  padding: 0.625rem 1.25rem;
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  transition: border-color 0.15s;
+}
+
+.btn-cancel:hover {
+  border-color: #94a3b8;
+}
