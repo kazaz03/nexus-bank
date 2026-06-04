@@ -59,9 +59,21 @@
               <dl>
                 <dt>Card number</dt><dd>{{ card.maskedCardNumber }}</dd>
                 <dt>Expires</dt><dd>{{ card.expiryDate }}</dd>
-                <dt>Status</dt><dd>{{ card.status }}</dd>
+                <dt>Status</dt>
+                <dd>
+                  <span class="badge badge-{{ card.status.toLowerCase() }}">{{ card.status }}</span>
+                </dd>
               </dl>
+              @if (card.status === 'PENDING') {
+                <button class="btn-activate" (click)="activateCard()"
+                        [disabled]="activating()">
+                  @if (activating()) { Activating… } @else { Activate card }
+                </button>
+              }
             </div>
+            @if (activateError()) {
+              <p class="error">{{ activateError() }}</p>
+            }
           }
         </div>
       }

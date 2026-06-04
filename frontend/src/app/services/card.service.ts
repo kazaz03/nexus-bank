@@ -19,6 +19,10 @@ export class CardService {
     );
   }
 
+  activateCard(cardId: number): Observable<DebitCard> {
+    return this.http.patch<DebitCard>(`${this.apiBase}/api/cards/${cardId}/activate`, null);
+  }
+
   blockCard(cardId: number): Observable<DebitCard> {
     return this.http.patch<DebitCard>(`${this.apiBase}/api/cards/${cardId}/block`, null);
   }

@@ -40,6 +40,8 @@ export class DashboardComponent implements OnInit {
   issuing = signal(false);
   issueError = signal<string | null>(null);
   issuedCard = signal<DebitCard | null>(null);
+  activating = signal(false);
+  activateError = signal<string | null>(null);
 
   ngOnInit(): void {
     if (this.role === 'TELLER' || this.role === 'ADMIN') {
@@ -118,6 +120,24 @@ export class DashboardComponent implements OnInit {
         this.issueError.set(
           body?.message || body?.error || `Failed to issue card (HTTP ${err?.status ?? '?'})`
         );
+      }
+    });
+  }
+
+  activateCard(): void {
+    const card = this.issuedCard();
+    if (!card) return;
+    this.activating.set(true);
+    this.activateError.set(null);
+    this.cardService.activateCard(card.id).subscribe({
+      next: updated => {
+        this.issuedCard.set(updated);
+        this.activating.set(false);
+      },
+      error: err => {
+        this.activating.set(false);
+        const body = err?.error;
+        this.activateError.set(body?.message || `Activation failed (HTTP ${err?.status ?? '?'})`);
       }
     });
   }
