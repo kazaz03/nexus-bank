@@ -1,0 +1,80 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  <section>
+    <div class="row">
+      <h2>My debit cards</h2>
+      <button class="btn-refresh" (click)="load()">Refresh</button>
+    </div>
+
+    @if (loading()) {
+      <p>Loading…</p>
+    }
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+    @if (successMsg()) {
+      <p class="success-msg">{{ successMsg() }}</p>
+    }
+
+    @if (!loading()) {
+      @if (accountsWithCards().length === 0) {
+        <p class="muted">You don't have any accounts yet.</p>
+      } @else {
+        @for (awc of accountsWithCards(); track awc.account.id) {
+          <div class="account-group">
+            <div class="account-header">
+              <span class="account-type">{{ awc.account.accountType }}</span>
+              <span class="account-iban">{{ awc.account.iban }}</span>
+              <span class="muted account-balance">
+                {{ awc.account.balance.toFixed(2) }} {{ awc.account.currency }}
+              </span>
+            </div>
+
+            @if (awc.cards.length === 0) {
+              <p class="muted no-cards">No cards issued for this account.</p>
+            } @else {
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Card number</th>
+                      <th>Expires</th>
+                      <th>Status</th>
+                      <th>Issued</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (card of awc.cards; track card.id) {
+                      <tr>
+                        <td class="card-number">{{ card.maskedCardNumber }}</td>
+                        <td>{{ formatDate(card.expiryDate) }}</td>
+                        <td>
+                          <span class="badge badge-{{ card.status.toLowerCase() }}">
+                            {{ card.status }}
+                          </span>
+                        </td>
+                        <td>{{ formatDate(card.issuedAt) }}</td>
+                        <td>
+                          @if (card.status === 'ACTIVE') {
+                            <button class="btn-block" (click)="blockCard(card)">Block</button>
+                          } @else if (card.status === 'BLOCKED') {
+                            <button class="btn-unblock" (click)="unblockCard(card)">Unblock</button>
+                          } @else {
+                            <span class="muted">—</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+      }
+    }
+  </section>
+</main>

@@ -1,0 +1,84 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  <section class="form-card">
+    <h2>My profile</h2>
+
+    @if (loading()) {
+      <p>Loading…</p>
+    } @else if (error()) {
+      <p class="error">{{ error() }}</p>
+    } @else if (profile(); as p) {
+
+      @if (!editing()) {
+        @if (saveSuccess()) {
+          <p class="success-msg">Profile updated successfully.</p>
+        }
+
+        <dl class="profile-dl">
+          <dt>Name</dt>
+          <dd>{{ p.firstName }} {{ p.lastName }}</dd>
+
+          <dt>Email</dt>
+          <dd>{{ p.email }}</dd>
+
+          <dt>Phone</dt>
+          <dd>{{ p.phone || '—' }}</dd>
+
+          <dt>Address</dt>
+          <dd>{{ p.address || '—' }}</dd>
+
+          <dt>Date of birth</dt>
+          <dd>{{ p.dateOfBirth || '—' }}</dd>
+
+          <dt>ID card</dt>
+          <dd>{{ p.idCardNumber || '—' }}</dd>
+
+          <dt>KYC status</dt>
+          <dd>
+            <span class="badge badge-{{ p.kycStatus.toLowerCase() }}">{{ p.kycStatus }}</span>
+          </dd>
+        </dl>
+
+        <button class="btn-primary" (click)="startEdit()">Edit profile</button>
+
+      } @else {
+        <form (ngSubmit)="save()" #f="ngForm">
+          <label>
+            First name
+            <input type="text" name="editFirstName" [(ngModel)]="editFirstName" required />
+          </label>
+
+          <label>
+            Last name
+            <input type="text" name="editLastName" [(ngModel)]="editLastName" required />
+          </label>
+
+          <label>
+            Phone
+            <input type="text" name="editPhone" [(ngModel)]="editPhone"
+                   placeholder="+387 61 123 456" />
+          </label>
+
+          <label>
+            Address
+            <input type="text" name="editAddress" [(ngModel)]="editAddress"
+                   placeholder="Street, City" />
+          </label>
+
+          @if (saveError()) {
+            <p class="error">{{ saveError() }}</p>
+          }
+
+          <div class="btn-row">
+            <button type="submit" [disabled]="saving()">
+              @if (saving()) { Saving… } @else { Save changes }
+            </button>
+            <button type="button" class="btn-cancel" (click)="cancelEdit()">Cancel</button>
+          </div>
+        </form>
+      }
+    }
+  </section>
+</main>
