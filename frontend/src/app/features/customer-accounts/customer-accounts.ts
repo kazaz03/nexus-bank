@@ -92,6 +92,10 @@ export class CustomerAccountsComponent implements OnInit {
     });
   }
 
+  viewTransactions(accountId: number): void {
+    this.router.navigate(['/transactions', accountId]);
+  }
+
   viewStatement(accountId: number): void {
     this.router.navigate(['/statement', accountId]);
   }

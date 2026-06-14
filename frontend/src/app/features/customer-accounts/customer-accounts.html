@@ -59,6 +59,7 @@
                 <span class="badge badge-{{ a.status.toLowerCase() }}">{{ a.status }}</span>
               </td>
               <td class="actions-cell">
+                <button class="btn-tx" (click)="viewTransactions(a.id)">Transactions</button>
                 <button class="btn-stmt" (click)="viewStatement(a.id)">Statement</button>
 
                 @if (role === 'ADMIN' && a.status !== 'CLOSED') {

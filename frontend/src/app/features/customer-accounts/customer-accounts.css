@@ -57,6 +57,23 @@
   align-items: center;
 }
 
+.btn-tx {
+  padding: 0.3125rem 0.75rem;
+  background: transparent;
+  color: #60a5fa;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.btn-tx:hover {
+  border-color: #2563eb;
+  color: #93c5fd;
+}
+
 .btn-stmt {
   padding: 0.3125rem 0.75rem;
   background: #2563eb;
