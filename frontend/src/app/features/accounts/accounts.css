@@ -3,6 +3,12 @@
   min-height: 100vh;
 }
 
+.actions-cell {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .btn-view {
   padding: 0.3125rem 0.75rem;
   background: #2563eb;
@@ -12,8 +18,26 @@
   cursor: pointer;
   font-size: 0.875rem;
   transition: background 0.15s;
+  white-space: nowrap;
 }
 
 .btn-view:hover {
   background: #1d4ed8;
+}
+
+.btn-stmt {
+  padding: 0.3125rem 0.75rem;
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.btn-stmt:hover {
+  border-color: #94a3b8;
+  color: #e2e8f0;
 }

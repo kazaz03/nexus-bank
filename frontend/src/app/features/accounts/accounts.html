@@ -40,8 +40,9 @@
                   }
                 </td>
                 <td>{{ a.status }}</td>
-                <td>
+                <td class="actions-cell">
                   <button class="btn-view" (click)="viewTransactions(a.id)">Transactions</button>
+                  <button class="btn-stmt" (click)="viewStatement(a.id)">Statement</button>
                 </td>
               </tr>
             }

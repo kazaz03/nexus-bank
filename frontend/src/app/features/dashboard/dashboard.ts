@@ -5,9 +5,11 @@ import { AuthService } from '../../core/services/auth.service';
 import { CustomerService } from '../../services/customer.service';
 import { AccountService } from '../../services/account.service';
 import { CardService } from '../../services/card.service';
+import { AdminService } from '../../services/admin.service';
 import { Customer } from '../../models/customer.model';
-import { Account } from '../../models/account.model';
+import { Account, CreateAccountRequest } from '../../models/account.model';
 import { DebitCard } from '../../models/card.model';
+import { AdminStats } from '../../models/admin-stats.model';
 import { TopbarComponent } from '../../shared/components/topbar/topbar';
 import { NavTabsComponent } from '../../shared/components/nav-tabs/nav-tabs';
 
@@ -22,6 +24,7 @@ export class DashboardComponent implements OnInit {
   private customerService = inject(CustomerService);
   private accountService = inject(AccountService);
   private cardService = inject(CardService);
+  private adminService = inject(AdminService);
   private router = inject(Router);
 
   email = this.auth.getEmail();
@@ -30,6 +33,10 @@ export class DashboardComponent implements OnInit {
   customers = signal<Customer[]>([]);
   loading = signal(false);
   error = signal<string | null>(null);
+
+  /* ── Admin stats ───────────────────────────── */
+  stats = signal<AdminStats | null>(null);
+  statsLoading = signal(false);
 
   /* ── Issue Card form (TELLER / ADMIN) ────────── */
   showIssueForm = signal(false);
@@ -43,9 +50,23 @@ export class DashboardComponent implements OnInit {
   activating = signal(false);
   activateError = signal<string | null>(null);
 
+  /* ── Open Account form (TELLER / ADMIN) ─────── */
+  showOpenAccountForm = signal(false);
+  openAccountCustomerId: number | null = null;
+  openAccountType = 'CHECKING';
+  openAccountCurrency = 'BAM';
+  openAccountOverdraft: number | null = null;
+  openAccountInterest: number | null = null;
+  openingAccount = signal(false);
+  openAccountError = signal<string | null>(null);
+  openAccountSuccess = signal<Account | null>(null);
+
   ngOnInit(): void {
     if (this.role === 'TELLER' || this.role === 'ADMIN') {
       this.loadCustomers();
+    }
+    if (this.role === 'ADMIN') {
+      this.loadStats();
     }
   }
 
@@ -57,6 +78,7 @@ export class DashboardComponent implements OnInit {
         this.loading.set(false);
         if (data.length > 0) {
           this.selectedCustomerId = data[0].id;
+          this.openAccountCustomerId = data[0].id;
           this.loadAccountsForCustomer(data[0].id);
         }
       },
@@ -64,6 +86,17 @@ export class DashboardComponent implements OnInit {
         this.loading.set(false);
         this.error.set(err?.status ? `Failed (HTTP ${err.status})` : 'Failed to load customers');
       }
+    });
+  }
+
+  loadStats(): void {
+    this.statsLoading.set(true);
+    this.adminService.getStats().subscribe({
+      next: data => {
+        this.stats.set(data);
+        this.statsLoading.set(false);
+      },
+      error: () => this.statsLoading.set(false)
     });
   }
 
@@ -140,6 +173,58 @@ export class DashboardComponent implements OnInit {
         this.activateError.set(body?.message || `Activation failed (HTTP ${err?.status ?? '?'})`);
       }
     });
+  }
+
+  /* ── Open Account ────────────────────────────── */
+  toggleOpenAccountForm(): void {
+    this.showOpenAccountForm.update(v => !v);
+    this.openAccountError.set(null);
+    this.openAccountSuccess.set(null);
+  }
+
+  openAccount(): void {
+    if (!this.openAccountCustomerId) {
+      this.openAccountError.set('Please select a customer.');
+      return;
+    }
+    this.openingAccount.set(true);
+    this.openAccountError.set(null);
+    this.openAccountSuccess.set(null);
+
+    const body: CreateAccountRequest = {
+      customerId: this.openAccountCustomerId,
+      accountType: this.openAccountType,
+      currency: this.openAccountCurrency,
+      createdBy: this.auth.getUserId() ?? undefined
+    };
+
+    if (this.openAccountType === 'CHECKING' && this.openAccountOverdraft != null) {
+      body.overdraftLimit = this.openAccountOverdraft;
+    }
+    if (this.openAccountType === 'SAVINGS' && this.openAccountInterest != null) {
+      body.interestRate = this.openAccountInterest;
+    }
+
+    this.accountService.openAccount(body).subscribe({
+      next: account => {
+        this.openAccountSuccess.set(account);
+        this.openingAccount.set(false);
+        this.openAccountOverdraft = null;
+        this.openAccountInterest = null;
+      },
+      error: err => {
+        this.openingAccount.set(false);
+        const body = err?.error;
+        this.openAccountError.set(
+          body?.message || body?.error || `Failed to open account (HTTP ${err?.status ?? '?'})`
+        );
+      }
+    });
+  }
+
+  /* ── Navigation ──────────────────────────────── */
+  manageAccounts(customerId: number): void {
+    this.router.navigate(['/customers', customerId, 'accounts']);
   }
 
   logout(): void {

@@ -4,6 +4,43 @@
 <main>
   @if (role === 'TELLER' || role === 'ADMIN') {
 
+    <!-- Admin stats (ADMIN only) -->
+    @if (role === 'ADMIN') {
+      <section class="stats-section">
+        <h2>Overview</h2>
+        @if (statsLoading()) {
+          <p class="muted">Loading stats…</p>
+        } @else if (stats(); as s) {
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-label">Total users</span>
+              <span class="stat-value">{{ s.totalUsers }}</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Customers</span>
+              <span class="stat-value">{{ s.totalCustomers }}</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Tellers</span>
+              <span class="stat-value">{{ s.totalTellers }}</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Loan officers</span>
+              <span class="stat-value">{{ s.totalLoanOfficers }}</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Admins</span>
+              <span class="stat-value">{{ s.totalAdmins }}</span>
+            </div>
+            <div class="stat-card stat-card--highlight">
+              <span class="stat-label">Active users</span>
+              <span class="stat-value">{{ s.activeUsers }}</span>
+            </div>
+          </div>
+        }
+      </section>
+    }
+
     <!-- Issue Card panel -->
     <section class="panel">
       <div class="panel-header" (click)="toggleIssueForm()">
@@ -79,6 +116,88 @@
       }
     </section>
 
+    <!-- Open Account panel -->
+    <section class="panel">
+      <div class="panel-header" (click)="toggleOpenAccountForm()">
+        <h2>Open account</h2>
+        <span class="toggle-icon">{{ showOpenAccountForm() ? '▲' : '▼' }}</span>
+      </div>
+
+      @if (showOpenAccountForm()) {
+        <div class="panel-body">
+          <div class="issue-form">
+            <label>
+              Customer
+              <select name="openAccountCustomerId" [(ngModel)]="openAccountCustomerId">
+                @for (c of customers(); track c.id) {
+                  <option [value]="c.id">
+                    {{ c.firstName }} {{ c.lastName }} ({{ c.email }})
+                  </option>
+                }
+              </select>
+            </label>
+
+            <label>
+              Account type
+              <select name="openAccountType" [(ngModel)]="openAccountType">
+                <option value="CHECKING">Checking</option>
+                <option value="SAVINGS">Savings</option>
+                <option value="FOREIGN">Foreign</option>
+              </select>
+            </label>
+
+            <label>
+              Currency
+              <select name="openAccountCurrency" [(ngModel)]="openAccountCurrency">
+                <option value="BAM">BAM</option>
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+                <option value="GBP">GBP</option>
+                <option value="CHF">CHF</option>
+              </select>
+            </label>
+
+            @if (openAccountType === 'CHECKING') {
+              <label>
+                Overdraft limit (optional)
+                <input type="number" name="openAccountOverdraft" [(ngModel)]="openAccountOverdraft"
+                       placeholder="0.00" min="0" class="input-num" />
+              </label>
+            }
+
+            @if (openAccountType === 'SAVINGS') {
+              <label>
+                Interest rate % (optional)
+                <input type="number" name="openAccountInterest" [(ngModel)]="openAccountInterest"
+                       placeholder="0.00" min="0" step="0.01" class="input-num" />
+              </label>
+            }
+
+            <button class="btn-issue" (click)="openAccount()" [disabled]="openingAccount()">
+              @if (openingAccount()) { Opening… } @else { Open account }
+            </button>
+          </div>
+
+          @if (openAccountError()) {
+            <p class="error">{{ openAccountError() }}</p>
+          }
+
+          @if (openAccountSuccess(); as acc) {
+            <div class="success">
+              <strong>Account opened successfully</strong>
+              <dl>
+                <dt>IBAN</dt><dd>{{ acc.iban }}</dd>
+                <dt>Type</dt><dd>{{ acc.accountType }}</dd>
+                <dt>Currency</dt><dd>{{ acc.currency }}</dd>
+                <dt>Status</dt>
+                <dd><span class="badge badge-active">{{ acc.status }}</span></dd>
+              </dl>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
     <!-- Customers table -->
     <section>
       <h2>Customers</h2>
@@ -95,6 +214,7 @@
                 <th>Name</th>
                 <th>Email</th>
                 <th>KYC</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -103,7 +223,14 @@
                   <td>{{ c.id }}</td>
                   <td>{{ c.firstName }} {{ c.lastName }}</td>
                   <td>{{ c.email }}</td>
-                  <td>{{ c.kycStatus }}</td>
+                  <td>
+                    <span class="badge badge-{{ c.kycStatus.toLowerCase() }}">{{ c.kycStatus }}</span>
+                  </td>
+                  <td>
+                    <button class="btn-manage" (click)="manageAccounts(c.id)">
+                      Manage accounts
+                    </button>
+                  </td>
                 </tr>
               }
             </tbody>

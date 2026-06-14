@@ -25,6 +25,12 @@
   border-color: #94a3b8;
 }
 
+.actions-cell {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .btn-details {
   padding: 0.3125rem 0.75rem;
   background: #1e293b;
@@ -40,6 +46,28 @@
 .btn-details:hover {
   border-color: #94a3b8;
   color: #e2e8f0;
+}
+
+.btn-edit {
+  padding: 0.3125rem 0.75rem;
+  background: transparent;
+  color: #fbbf24;
+  border: 1px solid #fbbf2444;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.btn-edit:hover:not(:disabled) {
+  background: #3f2d0a;
+  border-color: #fbbf24;
+}
+
+.btn-edit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* highlight the main row when its panel is open */
@@ -124,6 +152,109 @@
 
 .schedule-table {
   font-size: 0.875rem;
+}
+
+/* ── Edit form ───────────────────────────────── */
+.edit-section {
+  background: #0d1d35;
+  border: 1px solid #2563eb44;
+  border-radius: 6px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.edit-section h4 {
+  margin: 0 0 1rem;
+  font-size: 0.9375rem;
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+.edit-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 0.875rem;
+}
+
+.label-full {
+  grid-column: 1 / -1;
+}
+
+.edit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+.edit-input,
+.edit-select {
+  padding: 0.5rem 0.625rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.9375rem;
+}
+
+.edit-input:focus,
+.edit-select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.save-error {
+  margin: 0 0 0.875rem;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-save {
+  padding: 0.5rem 1.25rem;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  transition: background 0.15s;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btn-save:disabled {
+  background: #334155;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  border-color: #94a3b8;
+  color: #e2e8f0;
+}
+
+.btn-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* status note banners */

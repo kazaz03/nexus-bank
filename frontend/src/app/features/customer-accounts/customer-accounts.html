@@ -1,0 +1,79 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  <div class="page-header">
+    <button class="btn-back" (click)="goBack()">← Dashboard</button>
+    <div>
+      @if (customer(); as c) {
+        <h2>{{ c.firstName }} {{ c.lastName }}'s accounts</h2>
+        <p class="muted sub">{{ c.email }}</p>
+      } @else {
+        <h2>Customer #{{ customerId }} — Accounts</h2>
+      }
+    </div>
+  </div>
+
+  @if (closeSuccess()) {
+    <p class="success-msg">{{ closeSuccess() }}</p>
+  }
+  @if (closeError()) {
+    <p class="error">{{ closeError() }}</p>
+  }
+
+  @if (loading()) {
+    <p>Loading…</p>
+  } @else if (error()) {
+    <p class="error">{{ error() }}</p>
+  } @else if (accounts().length === 0) {
+    <p class="muted">This customer has no accounts.</p>
+  } @else {
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>IBAN</th>
+            <th>Type</th>
+            <th>Currency</th>
+            <th>Balance</th>
+            <th>Overdraft</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (a of accounts(); track a.id) {
+            <tr>
+              <td class="mono">{{ a.iban }}</td>
+              <td>{{ a.accountType }}</td>
+              <td>{{ a.currency }}</td>
+              <td>{{ formatAmount(a.balance, a.currency) }}</td>
+              <td>
+                @if (a.overdraftLimit && a.overdraftLimit > 0) {
+                  {{ formatAmount(a.overdraftLimit, a.currency) }}
+                } @else {
+                  —
+                }
+              </td>
+              <td>
+                <span class="badge badge-{{ a.status.toLowerCase() }}">{{ a.status }}</span>
+              </td>
+              <td class="actions-cell">
+                <button class="btn-stmt" (click)="viewStatement(a.id)">Statement</button>
+
+                @if (role === 'ADMIN' && a.status !== 'CLOSED') {
+                  <button class="btn-close"
+                          [disabled]="a.balance !== 0 || closingId() === a.id"
+                          [title]="a.balance !== 0 ? 'Balance must be zero to close' : 'Close account'"
+                          (click)="closeAccount(a)">
+                    @if (closingId() === a.id) { Closing… } @else { Close }
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</main>
