@@ -112,6 +112,29 @@ public class CustomerService {
         return toResponse(customer);
     }
 
+    @Transactional
+    public CustomerResponse updateKycStatus(Long customerId, String status, Long updatedByUserId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + customerId));
+
+        Customer.KycStatus newStatus;
+        try {
+            newStatus = Customer.KycStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new IllegalArgumentException("Invalid KYC status. Allowed: PENDING, VERIFIED, REJECTED.");
+        }
+
+        customer.setKycStatus(newStatus);
+        customer.setUpdatedAt(LocalDateTime.now());
+        if (updatedByUserId != null) {
+            userRepository.findById(updatedByUserId)
+                    .ifPresent(customer::setUpdatedBy);
+        }
+
+        customerRepository.save(customer);
+        return toResponse(customer);
+    }
+
     private CustomerResponse toResponse(Customer customer) {
         CustomerResponse response = new CustomerResponse();
         response.setId(customer.getId());

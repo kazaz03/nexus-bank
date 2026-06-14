@@ -353,10 +353,20 @@
               </label>
             }
 
-            <button class="btn-issue" (click)="openAccount()" [disabled]="openingAccount()">
+            <button class="btn-issue" (click)="openAccount()"
+                    [disabled]="openingAccount() || !openAccountCustomerVerified()">
               @if (openingAccount()) { Opening… } @else { Open account }
             </button>
           </div>
+
+          @if (openAccountCustomerId != null && !openAccountCustomerVerified()) {
+            <p class="warn">
+              ⚠ This customer's KYC is
+              <strong>{{ openAccountCustomerKyc() || 'not set' }}</strong>.
+              KYC must be <strong>VERIFIED</strong> before opening an account
+              (verify it in the Customers table below).
+            </p>
+          }
 
           @if (openAccountError()) {
             <p class="error">{{ openAccountError() }}</p>
@@ -388,6 +398,9 @@
       } @else {
         @if (editCustomerError()) {
           <p class="error">{{ editCustomerError() }}</p>
+        }
+        @if (kycError()) {
+          <p class="error">{{ kycError() }}</p>
         }
         <div class="table-wrapper">
           <table>
@@ -437,6 +450,20 @@
                     <td class="actions-cell">
                       <button class="btn-details" (click)="startEditCustomer(c)">Edit</button>
                       <button class="btn-manage" (click)="manageAccounts(c.id)">Manage accounts</button>
+                      @if (c.kycStatus === 'PENDING') {
+                        <button class="btn-activate-sm" [disabled]="kycUpdatingId() === c.id"
+                                (click)="setKyc(c, 'VERIFIED')">
+                          @if (kycUpdatingId() === c.id) { … } @else { Verify KYC }
+                        </button>
+                        <button class="btn-block-sm" [disabled]="kycUpdatingId() === c.id"
+                                (click)="setKyc(c, 'REJECTED')">Reject</button>
+                      } @else if (c.kycStatus === 'REJECTED') {
+                        <button class="btn-activate-sm" [disabled]="kycUpdatingId() === c.id"
+                                (click)="setKyc(c, 'VERIFIED')">Verify KYC</button>
+                      } @else if (c.kycStatus === 'VERIFIED') {
+                        <button class="btn-details" [disabled]="kycUpdatingId() === c.id"
+                                (click)="setKyc(c, 'REJECTED')">Revoke KYC</button>
+                      }
                     </td>
                   </tr>
                 }

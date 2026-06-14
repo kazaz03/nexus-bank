@@ -41,4 +41,8 @@ export class CustomerService {
   update(id: number, body: UpdateCustomerRequest): Observable<Customer> {
     return this.http.put<Customer>(`${this.apiBase}/api/customers/${id}`, body);
   }
+
+  updateKyc(id: number, status: 'VERIFIED' | 'REJECTED' | 'PENDING'): Observable<Customer> {
+    return this.http.patch<Customer>(`${this.apiBase}/api/customers/${id}/kyc`, { status });
+  }
 }

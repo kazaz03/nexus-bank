@@ -314,6 +314,8 @@ section {
 }
 
 .badge-closed { background: #64748b; color: #fff; }
+.badge-verified { background: #16a34a; color: #fff; }
+.badge-rejected { background: #dc2626; color: #fff; }
 
 /* Quick actions */
 .quick-actions {
@@ -406,6 +408,16 @@ input:focus {
 .success-msg {
   margin-top: 0.75rem;
   color: #86efac;
+}
+
+.warn {
+  margin-top: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  background: #422006;
+  border: 1px solid #ca8a04;
+  border-radius: 6px;
+  color: #fde68a;
+  font-size: 0.875rem;
 }
 
 .btn-details {

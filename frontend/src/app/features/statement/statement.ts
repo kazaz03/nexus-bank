@@ -93,6 +93,11 @@ export class StatementComponent implements OnInit {
     return d.toISOString().split('T')[0];
   }
 
+  /** Opens the browser print dialog — the user can print or "Save as PDF". */
+  printStatement(): void {
+    window.print();
+  }
+
   goBack(): void {
     const role = this.role;
     if (role === 'TELLER' || role === 'ADMIN') {

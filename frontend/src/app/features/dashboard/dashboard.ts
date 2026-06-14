@@ -95,6 +95,10 @@ export class DashboardComponent implements OnInit {
   savingCustomer = signal(false);
   editCustomerError = signal<string | null>(null);
 
+  /* ── KYC verification (TELLER / ADMIN) ────────── */
+  kycUpdatingId = signal<number | null>(null);
+  kycError = signal<string | null>(null);
+
   ngOnInit(): void {
     if (this.role === 'TELLER' || this.role === 'ADMIN') {
       this.loadCustomers();
@@ -263,6 +267,35 @@ export class DashboardComponent implements OnInit {
         this.savingCustomer.set(false);
         const b = err?.error;
         this.editCustomerError.set(b?.message || `Save failed (HTTP ${err?.status ?? '?'})`);
+      }
+    });
+  }
+
+  /** KYC status of the customer currently selected in the Open-account form. */
+  openAccountCustomerKyc(): string | null {
+    const id = this.openAccountCustomerId;
+    if (id == null) return null;
+    const c = this.customers().find(x => String(x.id) === String(id));
+    return c ? c.kycStatus : null;
+  }
+
+  openAccountCustomerVerified(): boolean {
+    return this.openAccountCustomerKyc() === 'VERIFIED';
+  }
+
+  /* ── KYC: verify / reject ────────────────────── */
+  setKyc(customer: Customer, status: 'VERIFIED' | 'REJECTED'): void {
+    this.kycError.set(null);
+    this.kycUpdatingId.set(customer.id);
+    this.customerService.updateKyc(customer.id, status).subscribe({
+      next: updated => {
+        this.kycUpdatingId.set(null);
+        this.customers.update(list => list.map(x => x.id === updated.id ? updated : x));
+      },
+      error: err => {
+        this.kycUpdatingId.set(null);
+        const b = err?.error;
+        this.kycError.set(b?.error || b?.message || `KYC update failed (HTTP ${err?.status ?? '?'})`);
       }
     });
   }
