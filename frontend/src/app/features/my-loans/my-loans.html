@@ -41,7 +41,13 @@
                   <span class="badge badge-{{ loan.status.toLowerCase() }}">{{ loan.status }}</span>
                 </td>
                 <td class="nowrap">{{ formatDate(loan.createdAt) }}</td>
-                <td>
+                <td class="actions-cell">
+                  @if (loan.status === 'PENDING') {
+                    <button class="btn-edit" (click)="startEdit(loan)"
+                            [disabled]="editingLoanId() === loan.id">
+                      Edit
+                    </button>
+                  }
                   <button class="btn-details" (click)="toggleDetails(loan)">
                     {{ expandedLoanId() === loan.id ? 'Hide' : 'Details' }}
                   </button>
@@ -52,6 +58,51 @@
                 <tr class="detail-row">
                   <td colspan="7">
                     <div class="detail-panel">
+
+                      <!-- Edit form (PENDING only) -->
+                      @if (editingLoanId() === loan.id) {
+                        <div class="edit-section">
+                          <h4>Edit application</h4>
+                          <div class="edit-form">
+                            <label>
+                              Amount (min 100)
+                              <input type="number" [(ngModel)]="editAmount"
+                                     name="editAmount" min="100" step="0.01" class="edit-input" />
+                            </label>
+                            <label>
+                              Currency
+                              <select [(ngModel)]="editCurrency" name="editCurrency" class="edit-select">
+                                <option value="BAM">BAM</option>
+                                <option value="EUR">EUR</option>
+                                <option value="USD">USD</option>
+                              </select>
+                            </label>
+                            <label>
+                              Term (months)
+                              <input type="number" [(ngModel)]="editTermMonths"
+                                     name="editTermMonths" min="1" step="1" class="edit-input" />
+                            </label>
+                            <label class="label-full">
+                              Purpose
+                              <input type="text" [(ngModel)]="editPurpose"
+                                     name="editPurpose" class="edit-input" />
+                            </label>
+                          </div>
+
+                          @if (saveError()) {
+                            <p class="error save-error">{{ saveError() }}</p>
+                          }
+
+                          <div class="edit-actions">
+                            <button class="btn-save" (click)="saveEdit(loan)" [disabled]="saving()">
+                              @if (saving()) { Saving… } @else { Save changes }
+                            </button>
+                            <button class="btn-cancel" (click)="cancelEdit()" [disabled]="saving()">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      }
 
                       <div class="detail-grid">
                         <div class="detail-item">

@@ -57,6 +57,10 @@ export class AccountsComponent implements OnInit {
     this.router.navigate(['/transactions', accountId]);
   }
 
+  viewStatement(accountId: number): void {
+    this.router.navigate(['/statement', accountId]);
+  }
+
   logout(): void {
     this.auth.logout();
     this.router.navigate(['/login']);

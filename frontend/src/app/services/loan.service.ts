@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
   Loan,
@@ -9,6 +9,12 @@ import {
   RepaymentSchedule
 } from '../models/loan.model';
 import { Page } from '../models/pagination.model';
+
+export interface JsonPatchOp {
+  op: 'replace' | 'add' | 'remove';
+  path: string;
+  value?: unknown;
+}
 
 @Injectable({ providedIn: 'root' })
 export class LoanService {
@@ -33,5 +39,14 @@ export class LoanService {
 
   getSchedule(loanId: number): Observable<RepaymentSchedule[]> {
     return this.http.get<RepaymentSchedule[]>(`${this.apiBase}/api/loans/${loanId}/schedule`);
+  }
+
+  patch(loanId: number, ops: JsonPatchOp[]): Observable<Loan> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json-patch+json' });
+    return this.http.patch<Loan>(
+      `${this.apiBase}/api/loans/${loanId}`,
+      ops,
+      { headers }
+    );
   }
 }

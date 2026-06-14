@@ -1,0 +1,93 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  <div class="page-header">
+    <button class="btn-back" (click)="goBack()">← Back</button>
+    <h2>Account statement — #{{ accountId }}</h2>
+  </div>
+
+  <section class="filter-bar">
+    <label>
+      From
+      <input type="date" [(ngModel)]="fromDate" name="fromDate" />
+    </label>
+    <label>
+      To
+      <input type="date" [(ngModel)]="toDate" name="toDate" />
+    </label>
+    <button class="btn-generate" (click)="generate()" [disabled]="loading()">
+      @if (loading()) { Generating… } @else { Generate }
+    </button>
+  </section>
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  @if (statement(); as s) {
+    <section class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">Opening balance</span>
+        <span class="summary-value">{{ formatAmount(s.openingBalance) }}</span>
+      </div>
+      <div class="summary-card summary-card--green">
+        <span class="summary-label">Total deposited</span>
+        <span class="summary-value">+ {{ formatAmount(s.totalDeposited) }}</span>
+      </div>
+      <div class="summary-card summary-card--red">
+        <span class="summary-label">Total withdrawn</span>
+        <span class="summary-value">− {{ formatAmount(s.totalWithdrawn) }}</span>
+      </div>
+      <div class="summary-card summary-card--highlight">
+        <span class="summary-label">Closing balance</span>
+        <span class="summary-value">{{ formatAmount(s.closingBalance) }}</span>
+      </div>
+    </section>
+
+    <section>
+      <h3>Transactions ({{ s.transactions.length }})</h3>
+
+      @if (s.transactions.length === 0) {
+        <p class="muted">No transactions in this period.</p>
+      } @else {
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Currency</th>
+                <th>Balance after</th>
+                <th>Counterparty IBAN</th>
+                <th>Reference</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of s.transactions; track t.id) {
+                <tr>
+                  <td class="nowrap">{{ formatDateTime(t.createdAt) }}</td>
+                  <td>
+                    <span class="type-badge type-{{ t.type.toLowerCase() }}">{{ t.type }}</span>
+                  </td>
+                  <td class="amount" [class.credit]="t.type === 'DEPOSIT'" [class.debit]="t.type === 'WITHDRAWAL'">
+                    {{ formatAmount(t.amount) }}
+                  </td>
+                  <td>{{ t.currency }}</td>
+                  <td>{{ formatAmount(t.balanceAfter) }}</td>
+                  <td class="mono">{{ t.counterpartyIban ?? '—' }}</td>
+                  <td>{{ t.reference ?? '—' }}</td>
+                  <td>
+                    <span class="badge badge-{{ t.status.toLowerCase() }}">{{ t.status }}</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  }
+</main>

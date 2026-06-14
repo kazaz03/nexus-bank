@@ -8,6 +8,8 @@ import {
   TransferResponse
 } from '../models/transaction.model';
 import { Page } from '../models/pagination.model';
+import { StatementResponse } from '../models/statement.model';
+import { ExchangeRate } from '../models/exchange-rate.model';
 
 @Injectable({ providedIn: 'root' })
 export class TransactionService {
@@ -36,5 +38,16 @@ export class TransactionService {
       `${this.apiBase}/api/transactions/transfer`,
       body
     );
+  }
+
+  getStatement(accountId: number, from: string, to: string): Observable<StatementResponse> {
+    const url = `${this.apiBase}/api/accounts/${accountId}/statement`
+      + `?from=${encodeURIComponent(from + 'T00:00:00')}`
+      + `&to=${encodeURIComponent(to + 'T23:59:59')}`;
+    return this.http.get<StatementResponse>(url);
+  }
+
+  getExchangeRates(): Observable<ExchangeRate[]> {
+    return this.http.get<ExchangeRate[]>(`${this.apiBase}/api/exchange-rates`);
   }
 }

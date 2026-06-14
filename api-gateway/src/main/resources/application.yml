@@ -51,6 +51,12 @@ spring:
             - Path=/api/customers/**, /api/admin/**
 
         # ── account-service ──────────────────────────────────────────────────
+        # Statement lives in transaction-service; match it before the generic accounts route.
+        - id: transaction-service-statement
+          uri: lb://transaction-service
+          predicates:
+            - Path=/api/accounts/*/statement
+
         - id: account-service
           uri: lb://account-service
           predicates:

@@ -1,0 +1,44 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  <section>
+    <div class="row">
+      <h2>Exchange rates</h2>
+      <button class="btn-refresh" (click)="load()" [disabled]="loading()">Refresh</button>
+    </div>
+
+    @if (loading()) {
+      <p>Loading…</p>
+    } @else if (error()) {
+      <p class="error">{{ error() }}</p>
+    } @else if (rates().length === 0) {
+      <p class="muted">No exchange rates available.</p>
+    } @else {
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>From</th>
+              <th>To</th>
+              <th>Rate</th>
+              <th>Valid from</th>
+              <th>Valid to</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of rates(); track r.id) {
+              <tr>
+                <td><span class="currency-badge">{{ r.fromCurrency }}</span></td>
+                <td><span class="currency-badge">{{ r.toCurrency }}</span></td>
+                <td class="rate-value">{{ r.rate }}</td>
+                <td class="nowrap">{{ formatDate(r.validFrom) }}</td>
+                <td class="nowrap">{{ r.validTo ? formatDate(r.validTo) : '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</main>
