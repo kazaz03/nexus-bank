@@ -221,3 +221,230 @@ select:disabled {
   background: #334155;
   cursor: not-allowed;
 }
+
+/* ── Customer overview ───────────────────────── */
+.welcome {
+  margin-bottom: 1.5rem;
+}
+
+.welcome h2 {
+  margin-bottom: 0.25rem;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.row h2 {
+  margin: 0;
+}
+
+.link-all {
+  color: #60a5fa;
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.link-all:hover {
+  text-decoration: underline;
+}
+
+section {
+  margin-bottom: 2rem;
+}
+
+/* Account summary cards */
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.account-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.account-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.account-type {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.account-balance {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.account-iban {
+  font-size: 0.8125rem;
+  font-family: ui-monospace, monospace;
+}
+
+.btn-view {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+  padding: 0.375rem 0.875rem;
+  background: transparent;
+  color: #60a5fa;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-view:hover {
+  border-color: #2563eb;
+  color: #93c5fd;
+}
+
+.badge-closed { background: #64748b; color: #fff; }
+
+/* Quick actions */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 1.125rem 1.25rem;
+  text-decoration: none;
+  color: #e2e8f0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.action-card:hover {
+  border-color: #2563eb;
+  background: #253347;
+}
+
+.action-title {
+  font-weight: 600;
+}
+
+.action-sub {
+  font-size: 0.8125rem;
+}
+
+/* ── Cards on selected account (teller) ──────── */
+.account-cards {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #334155;
+}
+
+.account-cards h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.card-number {
+  font-family: ui-monospace, monospace;
+}
+
+.btn-activate-sm,
+.btn-block-sm,
+.btn-unblock-sm {
+  padding: 0.3125rem 0.75rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  transition: background 0.15s;
+}
+
+.btn-activate-sm { background: #16a34a; }
+.btn-activate-sm:hover { background: #15803d; }
+
+.btn-block-sm { background: #dc2626; }
+.btn-block-sm:hover { background: #b91c1c; }
+
+.btn-unblock-sm { background: #2563eb; }
+.btn-unblock-sm:hover { background: #1d4ed8; }
+
+/* ── Register / edit customer (F01 / F04) ────── */
+input {
+  padding: 0.5rem 0.625rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 1rem;
+}
+
+input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.success-msg {
+  margin-top: 0.75rem;
+  color: #86efac;
+}
+
+.btn-details {
+  padding: 0.3125rem 0.75rem;
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.btn-details:hover {
+  border-color: #94a3b8;
+  color: #e2e8f0;
+}
+
+.actions-cell {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inline-fields {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.inline-fields input {
+  width: 100%;
+}
+
+.addr-input {
+  min-width: 140px;
+}
+
+.edit-row td {
+  background: #172033;
+}

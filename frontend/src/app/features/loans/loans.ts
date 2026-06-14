@@ -49,11 +49,17 @@ export class LoansComponent implements OnInit {
   }
 
   approve(loan: Loan): void {
+    this.error.set(null);
+    const reviewedBy = this.auth.getUserId();
+    if (!reviewedBy) {
+      this.error.set('Could not determine the reviewing officer. Please log in again.');
+      return;
+    }
     const body = {
       approved: true,
       amountApproved: loan.amountRequested,
       interestRate: 6.5,
-      reviewedBy: 3
+      reviewedBy
     };
     this.loanService.review(loan.id, body).subscribe({
       next: () => {
@@ -61,19 +67,25 @@ export class LoansComponent implements OnInit {
           list.map(l => l.id === loan.id ? { ...l, status: 'APPROVED' } : l)
         );
       },
-      error: err => this.error.set(err?.error?.message || 'Approval failed')
+      error: err => this.error.set(err?.error?.message || err?.error?.error || 'Approval failed')
     });
   }
 
   reject(loan: Loan): void {
-    const body = { approved: false, rejectionReason: 'Rejected by officer', reviewedBy: 3 };
+    this.error.set(null);
+    const reviewedBy = this.auth.getUserId();
+    if (!reviewedBy) {
+      this.error.set('Could not determine the reviewing officer. Please log in again.');
+      return;
+    }
+    const body = { approved: false, rejectionReason: 'Rejected by officer', reviewedBy };
     this.loanService.review(loan.id, body).subscribe({
       next: () => {
         this.loans.update(list =>
           list.map(l => l.id === loan.id ? { ...l, status: 'REJECTED' } : l)
         );
       },
-      error: err => this.error.set(err?.error?.message || 'Rejection failed')
+      error: err => this.error.set(err?.error?.message || err?.error?.error || 'Rejection failed')
     });
   }
 

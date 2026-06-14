@@ -5,7 +5,10 @@
   <section>
     <div class="row">
       <h2>My Loans</h2>
-      <button class="btn-refresh" (click)="load()">Refresh</button>
+      <div class="row-actions">
+        <a class="btn-apply" routerLink="/apply-loan">+ Apply for a loan</a>
+        <button class="btn-refresh" (click)="load()">Refresh</button>
+      </div>
     </div>
 
     @if (error()) {
