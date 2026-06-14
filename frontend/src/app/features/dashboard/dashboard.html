@@ -2,7 +2,82 @@
 <app-nav-tabs [role]="role" />
 
 <main>
-  @if (role === 'TELLER' || role === 'ADMIN') {
+  @if (role === 'CUSTOMER') {
+    <!-- ── CUSTOMER overview ─────────────────────── -->
+    <section class="welcome">
+      <h2>Welcome back, {{ email }}</h2>
+      <p class="muted">Here is a quick overview of your banking.</p>
+    </section>
+
+    <section>
+      <div class="row">
+        <h2>My accounts</h2>
+        <a class="link-all" routerLink="/accounts">View all →</a>
+      </div>
+
+      @if (myAccountsLoading()) {
+        <p>Loading…</p>
+      } @else if (myAccountsError()) {
+        <p class="error">{{ myAccountsError() }}</p>
+      } @else if (myAccounts().length === 0) {
+        <p class="muted">You don't have any accounts yet.</p>
+      } @else {
+        <div class="account-grid">
+          @for (a of myAccounts(); track a.id) {
+            <div class="account-card">
+              <div class="account-card-top">
+                <span class="account-type">{{ a.accountType }}</span>
+                <span class="badge badge-{{ a.status.toLowerCase() }}">{{ a.status }}</span>
+              </div>
+              <div class="account-balance">{{ formatAmount(a.balance, a.currency) }}</div>
+              <div class="account-iban muted">{{ a.iban }}</div>
+              <button class="btn-view" (click)="viewTransactions(a.id)">Transactions</button>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <section>
+      <h2>Quick actions</h2>
+      <div class="quick-actions">
+        <a class="action-card" routerLink="/transfer">
+          <span class="action-title">Transfer</span>
+          <span class="action-sub muted">Send money to another account</span>
+        </a>
+        <a class="action-card" routerLink="/apply-loan">
+          <span class="action-title">Apply for a loan</span>
+          <span class="action-sub muted">Request a personal loan</span>
+        </a>
+        <a class="action-card" routerLink="/cards">
+          <span class="action-title">Cards</span>
+          <span class="action-sub muted">Manage your debit cards</span>
+        </a>
+        <a class="action-card" routerLink="/my-loans">
+          <span class="action-title">My loans</span>
+          <span class="action-sub muted">Track loan status &amp; schedule</span>
+        </a>
+      </div>
+    </section>
+
+  } @else if (role === 'LOAN_OFFICER') {
+    <!-- ── LOAN OFFICER overview ─────────────────── -->
+    <section class="welcome">
+      <h2>Welcome, {{ email }}</h2>
+      <p class="muted">You are signed in as <strong>Loan officer</strong>.</p>
+    </section>
+
+    <section>
+      <h2>Quick actions</h2>
+      <div class="quick-actions">
+        <a class="action-card" routerLink="/loans">
+          <span class="action-title">Loan review queue</span>
+          <span class="action-sub muted">Review, approve or reject applications</span>
+        </a>
+      </div>
+    </section>
+
+  } @else if (role === 'TELLER' || role === 'ADMIN') {
 
     <!-- Admin stats (ADMIN only) -->
     @if (role === 'ADMIN') {
@@ -41,10 +116,10 @@
       </section>
     }
 
-    <!-- Issue Card panel -->
+    <!-- Issue & manage cards panel -->
     <section class="panel">
       <div class="panel-header" (click)="toggleIssueForm()">
-        <h2>Issue debit card</h2>
+        <h2>Issue &amp; manage debit cards</h2>
         <span class="toggle-icon">{{ showIssueForm() ? '▲' : '▼' }}</span>
       </div>
 
@@ -70,7 +145,8 @@
               } @else if (customerAccounts().length === 0) {
                 <select disabled><option>No accounts found</option></select>
               } @else {
-                <select name="accountId" [(ngModel)]="selectedAccountId">
+                <select name="accountId" [(ngModel)]="selectedAccountId"
+                        (ngModelChange)="onAccountChange()">
                   @for (a of customerAccounts(); track a.id) {
                     <option [value]="a.id">
                       {{ a.accountType }} · {{ a.iban }} ({{ a.balance.toFixed(2) }} {{ a.currency }})
@@ -111,6 +187,110 @@
             @if (activateError()) {
               <p class="error">{{ activateError() }}</p>
             }
+          }
+
+          <!-- Existing cards on the selected account -->
+          @if (selectedAccountId) {
+            <div class="account-cards">
+              <h3>Cards on this account</h3>
+
+              @if (cardActionError()) {
+                <p class="error">{{ cardActionError() }}</p>
+              }
+
+              @if (accountCardsLoading()) {
+                <p class="muted">Loading cards…</p>
+              } @else if (accountCards().length === 0) {
+                <p class="muted">No cards issued for this account yet.</p>
+              } @else {
+                <div class="table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Card number</th>
+                        <th>Expires</th>
+                        <th>Status</th>
+                        <th>Issued</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (card of accountCards(); track card.id) {
+                        <tr>
+                          <td class="card-number">{{ card.maskedCardNumber }}</td>
+                          <td>{{ formatCardDate(card.expiryDate) }}</td>
+                          <td>
+                            <span class="badge badge-{{ card.status.toLowerCase() }}">{{ card.status }}</span>
+                          </td>
+                          <td>{{ formatCardDate(card.issuedAt) }}</td>
+                          <td>
+                            @if (card.status === 'PENDING') {
+                              <button class="btn-activate-sm" (click)="activateExistingCard(card)">Activate</button>
+                            } @else if (card.status === 'ACTIVE') {
+                              <button class="btn-block-sm" (click)="blockExistingCard(card)">Block</button>
+                            } @else if (card.status === 'BLOCKED') {
+                              <button class="btn-unblock-sm" (click)="unblockExistingCard(card)">Unblock</button>
+                            } @else {
+                              <span class="muted">—</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- New customer panel (F01) -->
+    <section class="panel">
+      <div class="panel-header" (click)="toggleRegisterForm()">
+        <h2>Register new customer</h2>
+        <span class="toggle-icon">{{ showRegisterForm() ? '▲' : '▼' }}</span>
+      </div>
+
+      @if (showRegisterForm()) {
+        <div class="panel-body">
+          <div class="issue-form">
+            <label>Email
+              <input type="email" name="regEmail" [(ngModel)]="regEmail" placeholder="name@example.com" />
+            </label>
+            <label>Temporary password
+              <input type="text" name="regPassword" [(ngModel)]="regPassword" placeholder="initial password" />
+            </label>
+            <label>First name
+              <input type="text" name="regFirstName" [(ngModel)]="regFirstName" />
+            </label>
+            <label>Last name
+              <input type="text" name="regLastName" [(ngModel)]="regLastName" />
+            </label>
+            <label>Date of birth
+              <input type="date" name="regDateOfBirth" [(ngModel)]="regDateOfBirth" />
+            </label>
+            <label>ID card number
+              <input type="text" name="regIdCardNumber" [(ngModel)]="regIdCardNumber" />
+            </label>
+            <label>Address (optional)
+              <input type="text" name="regAddress" [(ngModel)]="regAddress" />
+            </label>
+            <label>Phone (optional)
+              <input type="text" name="regPhone" [(ngModel)]="regPhone" placeholder="+387 …" />
+            </label>
+          </div>
+
+          <button class="btn-issue" (click)="registerCustomer()" [disabled]="registering()">
+            @if (registering()) { Registering… } @else { Register customer }
+          </button>
+
+          @if (registerError()) {
+            <p class="error">{{ registerError() }}</p>
+          }
+          @if (registerSuccess()) {
+            <p class="success-msg">{{ registerSuccess() }}</p>
           }
         </div>
       }
@@ -173,10 +353,20 @@
               </label>
             }
 
-            <button class="btn-issue" (click)="openAccount()" [disabled]="openingAccount()">
+            <button class="btn-issue" (click)="openAccount()"
+                    [disabled]="openingAccount() || !openAccountCustomerVerified()">
               @if (openingAccount()) { Opening… } @else { Open account }
             </button>
           </div>
+
+          @if (openAccountCustomerId != null && !openAccountCustomerVerified()) {
+            <p class="warn">
+              ⚠ This customer's KYC is
+              <strong>{{ openAccountCustomerKyc() || 'not set' }}</strong>.
+              KYC must be <strong>VERIFIED</strong> before opening an account
+              (verify it in the Customers table below).
+            </p>
+          }
 
           @if (openAccountError()) {
             <p class="error">{{ openAccountError() }}</p>
@@ -206,6 +396,12 @@
       } @else if (error()) {
         <p class="error">{{ error() }}</p>
       } @else {
+        @if (editCustomerError()) {
+          <p class="error">{{ editCustomerError() }}</p>
+        }
+        @if (kycError()) {
+          <p class="error">{{ kycError() }}</p>
+        }
         <div class="table-wrapper">
           <table>
             <thead>
@@ -213,25 +409,64 @@
                 <th>ID</th>
                 <th>Name</th>
                 <th>Email</th>
+                <th>Phone</th>
                 <th>KYC</th>
-                <th></th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               @for (c of customers(); track c.id) {
-                <tr>
-                  <td>{{ c.id }}</td>
-                  <td>{{ c.firstName }} {{ c.lastName }}</td>
-                  <td>{{ c.email }}</td>
-                  <td>
-                    <span class="badge badge-{{ c.kycStatus.toLowerCase() }}">{{ c.kycStatus }}</span>
-                  </td>
-                  <td>
-                    <button class="btn-manage" (click)="manageAccounts(c.id)">
-                      Manage accounts
-                    </button>
-                  </td>
-                </tr>
+                @if (editingCustomerId() === c.id) {
+                  <tr class="edit-row">
+                    <td>{{ c.id }}</td>
+                    <td>
+                      <div class="inline-fields">
+                        <input type="text" name="editFirstName" [(ngModel)]="editFirstName" placeholder="First name" />
+                        <input type="text" name="editLastName" [(ngModel)]="editLastName" placeholder="Last name" />
+                      </div>
+                    </td>
+                    <td>{{ c.email }}</td>
+                    <td>
+                      <input type="text" name="editPhone" [(ngModel)]="editPhone" placeholder="Phone" />
+                    </td>
+                    <td>{{ c.kycStatus }}</td>
+                    <td class="actions-cell">
+                      <input type="text" name="editAddress" [(ngModel)]="editAddress" placeholder="Address" class="addr-input" />
+                      <button class="btn-activate-sm" (click)="saveCustomer(c)" [disabled]="savingCustomer()">
+                        @if (savingCustomer()) { Saving… } @else { Save }
+                      </button>
+                      <button class="btn-details" (click)="cancelEditCustomer()">Cancel</button>
+                    </td>
+                  </tr>
+                } @else {
+                  <tr>
+                    <td>{{ c.id }}</td>
+                    <td>{{ c.firstName }} {{ c.lastName }}</td>
+                    <td>{{ c.email }}</td>
+                    <td>{{ c.phone || '—' }}</td>
+                    <td>
+                      <span class="badge badge-{{ c.kycStatus.toLowerCase() }}">{{ c.kycStatus }}</span>
+                    </td>
+                    <td class="actions-cell">
+                      <button class="btn-details" (click)="startEditCustomer(c)">Edit</button>
+                      <button class="btn-manage" (click)="manageAccounts(c.id)">Manage accounts</button>
+                      @if (c.kycStatus === 'PENDING') {
+                        <button class="btn-activate-sm" [disabled]="kycUpdatingId() === c.id"
+                                (click)="setKyc(c, 'VERIFIED')">
+                          @if (kycUpdatingId() === c.id) { … } @else { Verify KYC }
+                        </button>
+                        <button class="btn-block-sm" [disabled]="kycUpdatingId() === c.id"
+                                (click)="setKyc(c, 'REJECTED')">Reject</button>
+                      } @else if (c.kycStatus === 'REJECTED') {
+                        <button class="btn-activate-sm" [disabled]="kycUpdatingId() === c.id"
+                                (click)="setKyc(c, 'VERIFIED')">Verify KYC</button>
+                      } @else if (c.kycStatus === 'VERIFIED') {
+                        <button class="btn-details" [disabled]="kycUpdatingId() === c.id"
+                                (click)="setKyc(c, 'REJECTED')">Revoke KYC</button>
+                      }
+                    </td>
+                  </tr>
+                }
               }
             </tbody>
           </table>
@@ -240,7 +475,7 @@
     </section>
 
   } @else {
-    <section>
+    <section class="welcome">
       <h2>Welcome, {{ email }}</h2>
       <p class="muted">You are signed in as <strong>{{ role }}</strong>.</p>
     </section>

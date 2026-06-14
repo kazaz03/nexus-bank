@@ -2,6 +2,7 @@ package com.nexusbank.userservice.controller;
 
 import com.nexusbank.userservice.dto.request.RegisterCustomerRequest;
 import com.nexusbank.userservice.dto.request.UpdateCustomerRequest;
+import com.nexusbank.userservice.dto.request.UpdateKycRequest;
 import com.nexusbank.userservice.dto.response.CustomerResponse;
 import com.nexusbank.userservice.security.JwtUtil;
 import com.nexusbank.userservice.service.CustomerService;
@@ -63,6 +64,16 @@ public class CustomerController {
             @RequestHeader("Authorization") String authHeader) {
         Long actorId = extractUserId(authHeader);
         return ResponseEntity.ok(customerService.updateCustomer(id, request, actorId));
+    }
+
+    @PatchMapping("/{id}/kyc")
+    @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
+    public ResponseEntity<CustomerResponse> updateKyc(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateKycRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        Long actorId = extractUserId(authHeader);
+        return ResponseEntity.ok(customerService.updateKycStatus(id, request.getStatus(), actorId));
     }
 
     private Long extractUserId(String authHeader) {

@@ -1,8 +1,9 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { CustomerService } from '../../services/customer.service';
+import { RegisterCustomerRequest, UpdateCustomerRequest } from '../../services/customer.service';
 import { AccountService } from '../../services/account.service';
 import { CardService } from '../../services/card.service';
 import { AdminService } from '../../services/admin.service';
@@ -15,7 +16,7 @@ import { NavTabsComponent } from '../../shared/components/nav-tabs/nav-tabs';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [FormsModule, TopbarComponent, NavTabsComponent],
+  imports: [FormsModule, RouterLink, TopbarComponent, NavTabsComponent],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css'
 })
@@ -37,6 +38,11 @@ export class DashboardComponent implements OnInit {
   /* ── Admin stats ───────────────────────────── */
   stats = signal<AdminStats | null>(null);
   statsLoading = signal(false);
+
+  /* ── Customer dashboard (own accounts overview) ─ */
+  myAccounts = signal<Account[]>([]);
+  myAccountsLoading = signal(false);
+  myAccountsError = signal<string | null>(null);
 
   /* ── Issue Card form (TELLER / ADMIN) ────────── */
   showIssueForm = signal(false);
@@ -61,13 +67,77 @@ export class DashboardComponent implements OnInit {
   openAccountError = signal<string | null>(null);
   openAccountSuccess = signal<Account | null>(null);
 
+  /* ── Existing cards for the selected account ──── */
+  accountCards = signal<DebitCard[]>([]);
+  accountCardsLoading = signal(false);
+  cardActionError = signal<string | null>(null);
+
+  /* ── Register new customer (F01) ──────────────── */
+  showRegisterForm = signal(false);
+  regEmail = '';
+  regPassword = '';
+  regFirstName = '';
+  regLastName = '';
+  regDateOfBirth = '';
+  regIdCardNumber = '';
+  regAddress = '';
+  regPhone = '';
+  registering = signal(false);
+  registerError = signal<string | null>(null);
+  registerSuccess = signal<string | null>(null);
+
+  /* ── Edit customer profile (F04) ──────────────── */
+  editingCustomerId = signal<number | null>(null);
+  editFirstName = '';
+  editLastName = '';
+  editPhone = '';
+  editAddress = '';
+  savingCustomer = signal(false);
+  editCustomerError = signal<string | null>(null);
+
+  /* ── KYC verification (TELLER / ADMIN) ────────── */
+  kycUpdatingId = signal<number | null>(null);
+  kycError = signal<string | null>(null);
+
   ngOnInit(): void {
     if (this.role === 'TELLER' || this.role === 'ADMIN') {
       this.loadCustomers();
+    } else if (this.role === 'CUSTOMER') {
+      this.loadMyAccounts();
     }
     if (this.role === 'ADMIN') {
       this.loadStats();
     }
+  }
+
+  loadMyAccounts(): void {
+    const customerId = this.auth.getCustomerId();
+    if (!customerId) {
+      this.myAccountsError.set('Customer profile not found. Please log in again.');
+      return;
+    }
+    this.myAccountsLoading.set(true);
+    this.myAccountsError.set(null);
+    this.accountService.getByCustomer(customerId).subscribe({
+      next: data => {
+        this.myAccounts.set(data);
+        this.myAccountsLoading.set(false);
+      },
+      error: err => {
+        this.myAccountsLoading.set(false);
+        this.myAccountsError.set(
+          err?.status ? `Failed (HTTP ${err.status})` : 'Failed to load accounts'
+        );
+      }
+    });
+  }
+
+  formatAmount(value: number, currency: string): string {
+    return `${value.toFixed(2)} ${currency}`;
+  }
+
+  viewTransactions(accountId: number): void {
+    this.router.navigate(['/transactions', accountId]);
   }
 
   loadCustomers(): void {
@@ -100,6 +170,136 @@ export class DashboardComponent implements OnInit {
     });
   }
 
+  /* ── F01: register new customer ──────────────── */
+  toggleRegisterForm(): void {
+    this.showRegisterForm.update(v => !v);
+    this.registerError.set(null);
+    this.registerSuccess.set(null);
+  }
+
+  registerCustomer(): void {
+    this.registerError.set(null);
+    this.registerSuccess.set(null);
+
+    if (!this.regEmail.trim() || !this.regPassword.trim() || !this.regFirstName.trim()
+        || !this.regLastName.trim() || !this.regDateOfBirth || !this.regIdCardNumber.trim()) {
+      this.registerError.set('Email, password, first/last name, date of birth and ID card number are required.');
+      return;
+    }
+
+    const body: RegisterCustomerRequest = {
+      email: this.regEmail.trim(),
+      password: this.regPassword,
+      firstName: this.regFirstName.trim(),
+      lastName: this.regLastName.trim(),
+      dateOfBirth: this.regDateOfBirth,
+      idCardNumber: this.regIdCardNumber.trim(),
+      address: this.regAddress.trim() || undefined,
+      phone: this.regPhone.trim() || undefined
+    };
+
+    this.registering.set(true);
+    this.customerService.register(body).subscribe({
+      next: created => {
+        this.registering.set(false);
+        this.registerSuccess.set(`Customer ${created.firstName} ${created.lastName} registered.`);
+        this.resetRegisterForm();
+        this.loadCustomers();
+      },
+      error: err => {
+        this.registering.set(false);
+        const b = err?.error;
+        this.registerError.set(
+          b?.message || b?.error || `Registration failed (HTTP ${err?.status ?? '?'})`
+        );
+      }
+    });
+  }
+
+  private resetRegisterForm(): void {
+    this.regEmail = '';
+    this.regPassword = '';
+    this.regFirstName = '';
+    this.regLastName = '';
+    this.regDateOfBirth = '';
+    this.regIdCardNumber = '';
+    this.regAddress = '';
+    this.regPhone = '';
+  }
+
+  /* ── F04: edit any customer profile ──────────── */
+  startEditCustomer(c: Customer): void {
+    this.editingCustomerId.set(c.id);
+    this.editFirstName = c.firstName;
+    this.editLastName = c.lastName;
+    this.editPhone = c.phone ?? '';
+    this.editAddress = c.address ?? '';
+    this.editCustomerError.set(null);
+  }
+
+  cancelEditCustomer(): void {
+    this.editingCustomerId.set(null);
+    this.editCustomerError.set(null);
+  }
+
+  saveCustomer(c: Customer): void {
+    if (!this.editFirstName.trim() || !this.editLastName.trim()) {
+      this.editCustomerError.set('First and last name are required.');
+      return;
+    }
+
+    const body: UpdateCustomerRequest = {
+      firstName: this.editFirstName.trim(),
+      lastName: this.editLastName.trim(),
+      phone: this.editPhone.trim() || undefined,
+      address: this.editAddress.trim() || undefined
+    };
+
+    this.savingCustomer.set(true);
+    this.editCustomerError.set(null);
+    this.customerService.update(c.id, body).subscribe({
+      next: updated => {
+        this.savingCustomer.set(false);
+        this.editingCustomerId.set(null);
+        this.customers.update(list => list.map(x => x.id === updated.id ? updated : x));
+      },
+      error: err => {
+        this.savingCustomer.set(false);
+        const b = err?.error;
+        this.editCustomerError.set(b?.message || `Save failed (HTTP ${err?.status ?? '?'})`);
+      }
+    });
+  }
+
+  /** KYC status of the customer currently selected in the Open-account form. */
+  openAccountCustomerKyc(): string | null {
+    const id = this.openAccountCustomerId;
+    if (id == null) return null;
+    const c = this.customers().find(x => String(x.id) === String(id));
+    return c ? c.kycStatus : null;
+  }
+
+  openAccountCustomerVerified(): boolean {
+    return this.openAccountCustomerKyc() === 'VERIFIED';
+  }
+
+  /* ── KYC: verify / reject ────────────────────── */
+  setKyc(customer: Customer, status: 'VERIFIED' | 'REJECTED'): void {
+    this.kycError.set(null);
+    this.kycUpdatingId.set(customer.id);
+    this.customerService.updateKyc(customer.id, status).subscribe({
+      next: updated => {
+        this.kycUpdatingId.set(null);
+        this.customers.update(list => list.map(x => x.id === updated.id ? updated : x));
+      },
+      error: err => {
+        this.kycUpdatingId.set(null);
+        const b = err?.error;
+        this.kycError.set(b?.error || b?.message || `KYC update failed (HTTP ${err?.status ?? '?'})`);
+      }
+    });
+  }
+
   toggleIssueForm(): void {
     this.showIssueForm.update(v => !v);
     this.issueError.set(null);
@@ -111,23 +311,92 @@ export class DashboardComponent implements OnInit {
       this.selectedAccountId = null;
       this.issuedCard.set(null);
       this.issueError.set(null);
+      this.accountCards.set([]);
       this.loadAccountsForCustomer(this.selectedCustomerId);
+    }
+  }
+
+  onAccountChange(): void {
+    this.issuedCard.set(null);
+    this.issueError.set(null);
+    if (this.selectedAccountId) {
+      this.loadCardsForAccount(this.selectedAccountId);
+    } else {
+      this.accountCards.set([]);
     }
   }
 
   private loadAccountsForCustomer(customerId: number): void {
     this.accountsLoading.set(true);
     this.customerAccounts.set([]);
+    this.accountCards.set([]);
     this.accountService.getByCustomer(customerId).subscribe({
       next: accounts => {
         this.customerAccounts.set(accounts);
         this.selectedAccountId = accounts.length > 0 ? accounts[0].id : null;
         this.accountsLoading.set(false);
+        if (this.selectedAccountId) {
+          this.loadCardsForAccount(this.selectedAccountId);
+        }
       },
       error: () => {
         this.accountsLoading.set(false);
       }
     });
+  }
+
+  private loadCardsForAccount(accountId: number): void {
+    this.accountCardsLoading.set(true);
+    this.cardActionError.set(null);
+    this.accountCards.set([]);
+    this.cardService.getByAccount(accountId).subscribe({
+      next: cards => {
+        this.accountCards.set(cards);
+        this.accountCardsLoading.set(false);
+      },
+      error: () => {
+        this.accountCardsLoading.set(false);
+      }
+    });
+  }
+
+  private replaceAccountCard(updated: DebitCard): void {
+    this.accountCards.update(list => list.map(c => c.id === updated.id ? updated : c));
+  }
+
+  activateExistingCard(card: DebitCard): void {
+    this.cardActionError.set(null);
+    this.cardService.activateCard(card.id).subscribe({
+      next: updated => this.replaceAccountCard(updated),
+      error: err => this.cardActionError.set(
+        err?.error?.message || `Activation failed (HTTP ${err?.status ?? '?'})`
+      )
+    });
+  }
+
+  blockExistingCard(card: DebitCard): void {
+    this.cardActionError.set(null);
+    this.cardService.blockCard(card.id).subscribe({
+      next: updated => this.replaceAccountCard(updated),
+      error: err => this.cardActionError.set(
+        err?.error?.message || `Block failed (HTTP ${err?.status ?? '?'})`
+      )
+    });
+  }
+
+  unblockExistingCard(card: DebitCard): void {
+    this.cardActionError.set(null);
+    this.cardService.unblockCard(card.id).subscribe({
+      next: updated => this.replaceAccountCard(updated),
+      error: err => this.cardActionError.set(
+        err?.error?.message || `Unblock failed (HTTP ${err?.status ?? '?'})`
+      )
+    });
+  }
+
+  formatCardDate(dateStr: string): string {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-GB');
   }
 
   issueCard(): void {
@@ -146,6 +415,9 @@ export class DashboardComponent implements OnInit {
       next: card => {
         this.issuedCard.set(card);
         this.issuing.set(false);
+        if (this.selectedAccountId) {
+          this.loadCardsForAccount(this.selectedAccountId);
+        }
       },
       error: err => {
         this.issuing.set(false);
@@ -166,6 +438,7 @@ export class DashboardComponent implements OnInit {
       next: updated => {
         this.issuedCard.set(updated);
         this.activating.set(false);
+        this.replaceAccountCard(updated);
       },
       error: err => {
         this.activating.set(false);

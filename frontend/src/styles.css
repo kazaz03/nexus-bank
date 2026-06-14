@@ -78,3 +78,36 @@ th {
     font-size: 0.6875rem;
   }
 }
+
+/* ── Print (used by the Statement "Save as PDF") ── */
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  app-topbar,
+  app-nav-tabs,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    padding: 0;
+  }
+
+  table {
+    background: #fff;
+    color: #000;
+  }
+
+  th {
+    background: #f1f5f9;
+    color: #000;
+  }
+
+  th,
+  td {
+    border-bottom: 1px solid #cbd5e1;
+  }
+}

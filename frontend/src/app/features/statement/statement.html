@@ -2,12 +2,15 @@
 <app-nav-tabs [role]="role" />
 
 <main>
-  <div class="page-header">
+  <div class="page-header no-print">
     <button class="btn-back" (click)="goBack()">← Back</button>
     <h2>Account statement — #{{ accountId }}</h2>
+    @if (statement()) {
+      <button class="btn-print" (click)="printStatement()">Print / Save as PDF</button>
+    }
   </div>
 
-  <section class="filter-bar">
+  <section class="filter-bar no-print">
     <label>
       From
       <input type="date" [(ngModel)]="fromDate" name="fromDate" />

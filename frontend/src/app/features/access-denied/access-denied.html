@@ -1,0 +1,14 @@
+<app-topbar [email]="email" [role]="role" (logout)="logout()" />
+<app-nav-tabs [role]="role" />
+
+<main>
+  <section class="denied">
+    <div class="denied-icon">⛔</div>
+    <h2>Access denied</h2>
+    <p class="muted">
+      You don't have permission to view this page
+      @if (role) { as <strong>{{ role }}</strong> }.
+    </p>
+    <button class="btn-primary" (click)="goToDashboard()">Back to dashboard</button>
+  </section>
+</main>

@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { LoanService } from '../../services/loan.service';
 import { Loan, RepaymentSchedule } from '../../models/loan.model';
@@ -9,7 +9,7 @@ import { NavTabsComponent } from '../../shared/components/nav-tabs/nav-tabs';
 
 @Component({
   selector: 'app-my-loans',
-  imports: [FormsModule, TopbarComponent, NavTabsComponent],
+  imports: [FormsModule, RouterLink, TopbarComponent, NavTabsComponent],
   templateUrl: './my-loans.html',
   styleUrl: './my-loans.css'
 })
@@ -45,7 +45,10 @@ export class MyLoansComponent implements OnInit {
 
   load(): void {
     const customerId = this.auth.getCustomerId();
-    if (!customerId) return;
+    if (!customerId) {
+      this.error.set('Customer profile not found. Please log in again.');
+      return;
+    }
 
     this.loading.set(true);
     this.error.set(null);

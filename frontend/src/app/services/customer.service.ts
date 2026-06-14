@@ -10,6 +10,17 @@ export interface UpdateCustomerRequest {
   phone?: string;
 }
 
+export interface RegisterCustomerRequest {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;   // yyyy-MM-dd
+  idCardNumber: string;
+  address?: string;
+  phone?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CustomerService {
   private http = inject(HttpClient);
@@ -19,11 +30,19 @@ export class CustomerService {
     return this.http.get<Customer[]>(`${this.apiBase}/api/customers`);
   }
 
+  register(body: RegisterCustomerRequest): Observable<Customer> {
+    return this.http.post<Customer>(`${this.apiBase}/api/customers`, body);
+  }
+
   getMe(): Observable<Customer> {
     return this.http.get<Customer>(`${this.apiBase}/api/customers/me`);
   }
 
   update(id: number, body: UpdateCustomerRequest): Observable<Customer> {
     return this.http.put<Customer>(`${this.apiBase}/api/customers/${id}`, body);
+  }
+
+  updateKyc(id: number, status: 'VERIFIED' | 'REJECTED' | 'PENDING'): Observable<Customer> {
+    return this.http.patch<Customer>(`${this.apiBase}/api/customers/${id}/kyc`, { status });
   }
 }
