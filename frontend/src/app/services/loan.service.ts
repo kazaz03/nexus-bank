@@ -5,7 +5,8 @@ import {
   Loan,
   LoanApplicationRequest,
   LoanApplicationResponse,
-  LoanReviewRequest
+  LoanReviewRequest,
+  RepaymentSchedule
 } from '../models/loan.model';
 import { Page } from '../models/pagination.model';
 
@@ -24,5 +25,13 @@ export class LoanService {
 
   apply(body: LoanApplicationRequest): Observable<LoanApplicationResponse> {
     return this.http.post<LoanApplicationResponse>(`${this.apiBase}/api/loans`, body);
+  }
+
+  getByCustomer(customerId: number): Observable<Loan[]> {
+    return this.http.get<Loan[]>(`${this.apiBase}/api/loans/customer/${customerId}`);
+  }
+
+  getSchedule(loanId: number): Observable<RepaymentSchedule[]> {
+    return this.http.get<RepaymentSchedule[]>(`${this.apiBase}/api/loans/${loanId}/schedule`);
   }
 }

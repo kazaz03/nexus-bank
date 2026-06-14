@@ -39,3 +39,5 @@ graphify-out/
 # RSA / PEM keys — never commit private or public keys
 *.pem
 **/keys/
+
+.ai/

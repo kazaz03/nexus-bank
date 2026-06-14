@@ -9,6 +9,7 @@ import { TransferComponent } from './features/transfer/transfer';
 import { TransactionsComponent } from './features/transactions/transactions';
 import { ApplyLoanComponent } from './features/apply-loan/apply-loan';
 import { LoanConfirmationComponent } from './features/loan-confirmation/loan-confirmation';
+import { MyLoansComponent } from './features/my-loans/my-loans';
 import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
@@ -23,5 +24,6 @@ export const routes: Routes = [
   { path: 'transactions/:accountId',   component: TransactionsComponent,     canActivate: [authGuard] },
   { path: 'apply-loan',                component: ApplyLoanComponent,        canActivate: [authGuard] },
   { path: 'loan-confirmation',         component: LoanConfirmationComponent, canActivate: [authGuard] },
+  { path: 'my-loans',                  component: MyLoansComponent,          canActivate: [authGuard] },
   { path: '**',                        redirectTo: '/login' }
 ];

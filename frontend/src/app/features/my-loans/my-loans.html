@@ -4,7 +4,7 @@
 <main>
   <section>
     <div class="row">
-      <h2>Loan applications</h2>
+      <h2>My Loans</h2>
       <button class="btn-refresh" (click)="load()">Refresh</button>
     </div>
 
@@ -14,85 +14,105 @@
 
     @if (loading()) {
       <p>Loading…</p>
+    } @else if (loans().length === 0) {
+      <p class="muted">You have no loan applications yet.</p>
     } @else {
       <div class="table-wrapper">
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Customer</th>
-              <th>Account</th>
+              <th>#</th>
               <th>Requested</th>
               <th>Term</th>
+              <th>Purpose</th>
               <th>Status</th>
-              <th>Actions</th>
+              <th>Applied</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            @for (l of loans(); track l.id) {
-              <tr [class.expanded-row]="expandedLoanId() === l.id">
-                <td>{{ l.id }}</td>
-                <td>{{ l.customerId }}</td>
-                <td>{{ l.accountId }}</td>
-                <td>{{ formatAmount(l.amountRequested, l.currency) }}</td>
-                <td>{{ l.termMonths }} mo</td>
+            @for (loan of loans(); track loan.id) {
+              <tr [class.expanded-row]="expandedLoanId() === loan.id">
+                <td>{{ loan.id }}</td>
+                <td>{{ formatAmount(loan.amountRequested, loan.currency) }}</td>
+                <td>{{ loan.termMonths }} mo</td>
+                <td>{{ loan.purpose }}</td>
                 <td>
-                  <span class="badge badge-{{ l.status.toLowerCase() }}">{{ l.status }}</span>
+                  <span class="badge badge-{{ loan.status.toLowerCase() }}">{{ loan.status }}</span>
                 </td>
-                <td class="actions-cell">
-                  @if (l.status === 'PENDING') {
-                    <button class="btn-approve" (click)="approve(l)">Approve</button>
-                    <button class="btn-reject" (click)="reject(l)">Reject</button>
-                  } @else {
-                    <span class="muted">—</span>
-                  }
-                  <button class="btn-details" (click)="toggleDetails(l)">
-                    {{ expandedLoanId() === l.id ? 'Hide' : 'Details' }}
+                <td class="nowrap">{{ formatDate(loan.createdAt) }}</td>
+                <td>
+                  <button class="btn-details" (click)="toggleDetails(loan)">
+                    {{ expandedLoanId() === loan.id ? 'Hide' : 'Details' }}
                   </button>
                 </td>
               </tr>
 
-              @if (expandedLoanId() === l.id) {
+              @if (expandedLoanId() === loan.id) {
                 <tr class="detail-row">
                   <td colspan="7">
                     <div class="detail-panel">
 
                       <div class="detail-grid">
                         <div class="detail-item">
+                          <span class="detail-label">Loan ID</span>
+                          <span class="detail-value">#{{ loan.id }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Status</span>
+                          <span class="badge badge-{{ loan.status.toLowerCase() }}">{{ loan.status }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">Requested amount</span>
+                          <span class="detail-value">{{ formatAmount(loan.amountRequested, loan.currency) }}</span>
+                        </div>
+                        <div class="detail-item">
                           <span class="detail-label">Approved amount</span>
-                          <span class="detail-value">{{ formatAmount(l.amountApproved, l.currency) }}</span>
+                          <span class="detail-value">{{ formatAmount(loan.amountApproved, loan.currency) }}</span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">Interest rate</span>
                           <span class="detail-value">
-                            {{ l.interestRate !== null ? l.interestRate + '% p.a.' : '—' }}
+                            {{ loan.interestRate !== null ? loan.interestRate + '% p.a.' : '—' }}
                           </span>
                         </div>
                         <div class="detail-item">
+                          <span class="detail-label">Term</span>
+                          <span class="detail-value">{{ loan.termMonths }} months</span>
+                        </div>
+                        <div class="detail-item">
                           <span class="detail-label">Purpose</span>
-                          <span class="detail-value">{{ l.purpose }}</span>
+                          <span class="detail-value">{{ loan.purpose }}</span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">Applied on</span>
-                          <span class="detail-value">{{ formatDate(l.createdAt) }}</span>
+                          <span class="detail-value">{{ formatDate(loan.createdAt) }}</span>
                         </div>
-                        @if (l.reviewedAt) {
+                        @if (loan.reviewedAt) {
                           <div class="detail-item">
                             <span class="detail-label">Reviewed on</span>
-                            <span class="detail-value">{{ formatDate(l.reviewedAt) }}</span>
+                            <span class="detail-value">{{ formatDate(loan.reviewedAt) }}</span>
                           </div>
                         }
-                        @if (l.rejectionReason) {
+                        @if (loan.rejectionReason) {
                           <div class="detail-item detail-item--full">
                             <span class="detail-label">Rejection reason</span>
-                            <span class="detail-value detail-value--rejected">{{ l.rejectionReason }}</span>
+                            <span class="detail-value detail-value--rejected">{{ loan.rejectionReason }}</span>
                           </div>
                         }
                       </div>
 
-                      @if (l.status === 'DISBURSED') {
+                      @if (loan.status === 'DISBURSED') {
                         <div class="schedule-section">
-                          <h4>Repayment schedule</h4>
+                          <div class="schedule-header">
+                            <h4>Repayment schedule</h4>
+                            @if (schedule().length > 0) {
+                              <span class="remaining">
+                                Remaining: <strong>{{ formatAmount(remainingBalance(loan), loan.currency) }}</strong>
+                              </span>
+                            }
+                          </div>
+
                           @if (scheduleLoading()) {
                             <p class="muted">Loading schedule…</p>
                           } @else if (scheduleError()) {
@@ -116,8 +136,8 @@
                                     <tr>
                                       <td>{{ s.installmentNumber }}</td>
                                       <td class="nowrap">{{ formatDate(s.dueDate) }}</td>
-                                      <td>{{ formatAmount(s.amountDue, l.currency) }}</td>
-                                      <td>{{ formatAmount(s.amountPaid, l.currency) }}</td>
+                                      <td>{{ formatAmount(s.amountDue, loan.currency) }}</td>
+                                      <td>{{ formatAmount(s.amountPaid, loan.currency) }}</td>
                                       <td>
                                         <span class="badge badge-{{ s.status.toLowerCase() }}">{{ s.status }}</span>
                                       </td>
@@ -128,6 +148,18 @@
                             </div>
                           }
                         </div>
+                      }
+
+                      @if (loan.status === 'PENDING') {
+                        <p class="status-note status-note--pending">
+                          Your application is awaiting review by a loan officer.
+                        </p>
+                      }
+
+                      @if (loan.status === 'APPROVED') {
+                        <p class="status-note status-note--approved">
+                          Your loan has been approved and disbursement is being processed.
+                        </p>
                       }
 
                     </div>
