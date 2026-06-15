@@ -472,7 +472,8 @@
 
             <label>
               Account type
-              <select name="openAccountType" [(ngModel)]="openAccountType">
+              <select name="openAccountType" [(ngModel)]="openAccountType"
+                      (ngModelChange)="onAccountTypeChange()">
                 <option value="CHECKING">Checking</option>
                 <option value="SAVINGS">Savings</option>
                 <option value="FOREIGN">Foreign</option>
@@ -482,13 +483,23 @@
             <label>
               Currency
               <select name="openAccountCurrency" [(ngModel)]="openAccountCurrency">
-                <option value="BAM">BAM</option>
-                <option value="EUR">EUR</option>
-                <option value="USD">USD</option>
-                <option value="GBP">GBP</option>
-                <option value="CHF">CHF</option>
+                @if (openAccountType === 'FOREIGN') {
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                  <option value="GBP">GBP</option>
+                  <option value="CHF">CHF</option>
+                } @else {
+                  <option value="BAM">BAM</option>
+                }
               </select>
             </label>
+
+            @if (openAccountType === 'FOREIGN') {
+              <p class="muted">
+                Foreign account: holds a non-domestic currency. A unique IBAN is
+                assigned automatically on creation.
+              </p>
+            }
 
             @if (openAccountType === 'CHECKING') {
               <label>
