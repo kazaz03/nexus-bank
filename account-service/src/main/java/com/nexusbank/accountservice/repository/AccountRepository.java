@@ -17,6 +17,10 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     List<Account> findByCustomerId(Long customerId);
 
     Optional<Account> findByIban(String iban);
+
+    long countByStatus(Account.AccountStatus status);
+
+    long countByStatusAndAccountType(Account.AccountStatus status, Account.AccountType accountType);
     @Modifying
     @Query("UPDATE Account a SET a.balance = a.balance - :amount " +
            "WHERE a.id = :accountId " +

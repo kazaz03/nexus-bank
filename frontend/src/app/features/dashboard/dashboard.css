@@ -42,6 +42,139 @@
   line-height: 1;
 }
 
+.stat-sub {
+  font-size: 0.75rem;
+}
+
+.stat-card--warn {
+  border-color: #ca8a04;
+}
+
+.stats-grid--secondary {
+  margin-top: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.stats-grid--secondary .stat-value {
+  font-size: 1.35rem;
+}
+
+/* ── Stats panels: chart + distribution ──────── */
+.stats-panels {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 760px) {
+  .stats-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 1.25rem;
+}
+
+.chart-card h3 {
+  margin: 0 0 1rem;
+  font-size: 0.9375rem;
+  color: #e2e8f0;
+}
+
+/* 7-day bar chart */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem;
+  height: 160px;
+}
+
+.bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+}
+
+.bar-wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  flex: 1;
+  width: 100%;
+}
+
+.bar-count {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-bottom: 0.25rem;
+}
+
+.bar {
+  width: 70%;
+  max-width: 36px;
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease;
+}
+
+.bar-label {
+  font-size: 0.6875rem;
+  color: #64748b;
+  margin-top: 0.5rem;
+  white-space: nowrap;
+}
+
+/* Account type distribution */
+.dist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.dist-row {
+  display: grid;
+  grid-template-columns: 70px 1fr auto;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.dist-label {
+  font-size: 0.8125rem;
+  color: #cbd5e1;
+}
+
+.dist-track {
+  height: 10px;
+  background: #0f172a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dist-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.dist-fill--checking { background: #2563eb; }
+.dist-fill--savings { background: #16a34a; }
+.dist-fill--foreign { background: #d97706; }
+
+.dist-value {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
 /* ── Collapsible panel ───────────────────────── */
 .panel {
   background: #1e293b;
@@ -220,6 +353,38 @@ select:disabled {
 .btn-activate:disabled {
   background: #334155;
   cursor: not-allowed;
+}
+
+/* ── Cash deposit / withdrawal (F10) ─────────── */
+.cash-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.875rem;
+}
+
+.btn-withdraw {
+  padding: 0.5rem 1.25rem;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  transition: background 0.15s;
+}
+
+.btn-withdraw:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn-withdraw:disabled {
+  background: #334155;
+  cursor: not-allowed;
+}
+
+.cash-actions .btn-activate {
+  margin-top: 0;
 }
 
 /* ── Customer overview ───────────────────────── */

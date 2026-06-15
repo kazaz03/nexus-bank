@@ -1,10 +1,13 @@
 package com.nexusbank.transactionservice.controller;
 
+import com.nexusbank.transactionservice.dto.request.CashTransactionRequest;
 import com.nexusbank.transactionservice.dto.request.TransferRequest;
 import com.nexusbank.transactionservice.dto.response.ExchangeRateResponse;
 import com.nexusbank.transactionservice.dto.response.StatementResponse;
 import com.nexusbank.transactionservice.dto.response.TransactionResponse;
 import com.nexusbank.transactionservice.dto.response.TransferResponse;
+import com.nexusbank.transactionservice.service.CashService;
+import com.nexusbank.transactionservice.service.StatementPdfService;
 import com.nexusbank.transactionservice.service.TransactionService;
 import com.nexusbank.transactionservice.service.TransferService;
 import jakarta.validation.Valid;
@@ -13,7 +16,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -27,11 +32,17 @@ public class TransactionController {
 
     private final TransactionService transactionService;
     private final TransferService transferService;
+    private final CashService cashService;
+    private final StatementPdfService statementPdfService;
 
     public TransactionController(TransactionService transactionService,
-                                 TransferService transferService) {
+                                 TransferService transferService,
+                                 CashService cashService,
+                                 StatementPdfService statementPdfService) {
         this.transactionService = transactionService;
         this.transferService = transferService;
+        this.cashService = cashService;
+        this.statementPdfService = statementPdfService;
     }
 
     @PostMapping("/transactions/transfer")
@@ -39,6 +50,20 @@ public class TransactionController {
     public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request) {
         TransferResponse response = transferService.transfer(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /** F10: teller deposits cash onto a customer's account. */
+    @PostMapping("/transactions/deposit")
+    @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
+    public ResponseEntity<TransactionResponse> deposit(@Valid @RequestBody CashTransactionRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(cashService.deposit(request));
+    }
+
+    /** F10: teller withdraws cash from a customer's account. */
+    @PostMapping("/transactions/withdrawal")
+    @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
+    public ResponseEntity<TransactionResponse> withdrawal(@Valid @RequestBody CashTransactionRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(cashService.withdraw(request));
     }
 
     @GetMapping("/transactions/{id}")
@@ -68,6 +93,23 @@ public class TransactionController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
         return ResponseEntity.ok(transactionService.getStatement(accountId, from, to));
+    }
+
+    /** F16: server-side PDF export of an account statement. */
+    @GetMapping("/transactions/accounts/{accountId}/statement/pdf")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
+    public ResponseEntity<byte[]> getStatementPdf(
+            @PathVariable Long accountId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        StatementResponse statement = transactionService.getStatement(accountId, from, to);
+        byte[] pdf = statementPdfService.generate(statement);
+
+        String filename = "statement-account-" + accountId + ".pdf";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(pdf);
     }
 
     @GetMapping("/exchange-rates")

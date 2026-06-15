@@ -1,8 +1,10 @@
 package com.nexusbank.transactionservice.service;
 
+import com.nexusbank.transactionservice.dto.response.DailyVolumeResponse;
 import com.nexusbank.transactionservice.dto.response.ExchangeRateResponse;
 import com.nexusbank.transactionservice.dto.response.StatementResponse;
 import com.nexusbank.transactionservice.dto.response.TransactionResponse;
+import com.nexusbank.transactionservice.dto.response.TransactionStatsResponse;
 import com.nexusbank.transactionservice.exception.ResourceNotFoundException;
 import com.nexusbank.transactionservice.model.Transaction;
 import com.nexusbank.transactionservice.repository.ExchangeRateRepository;
@@ -13,8 +15,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 @Service
 public class TransactionService {
@@ -103,6 +110,45 @@ public class TransactionService {
         statement.setClosingBalance(closingBalance);
         statement.setTransactions(txResponses);
         return statement;
+    }
+
+    /** Aggregate transaction metrics for the admin dashboard (F17). */
+    public TransactionStatsResponse getStats() {
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfToday = today.atStartOfDay();
+        LocalDateTime now = LocalDateTime.now();
+
+        long transactionsToday = transactionRepository.countByCreatedAtBetween(startOfToday, now);
+        long totalTransactions = transactionRepository.count();
+
+        // Build a continuous 7-day series (oldest → today), seeding every day
+        // with zeros so the chart never has gaps even on quiet days.
+        LocalDate windowStart = today.minusDays(6);
+        Map<LocalDate, long[]> counts = new TreeMap<>();
+        Map<LocalDate, BigDecimal> sums = new TreeMap<>();
+        for (int i = 0; i < 7; i++) {
+            LocalDate day = windowStart.plusDays(i);
+            counts.put(day, new long[]{0L});
+            sums.put(day, BigDecimal.ZERO);
+        }
+
+        List<Transaction> recent = transactionRepository.findByCreatedAtBetween(
+                windowStart.atStartOfDay(), today.atTime(LocalTime.MAX));
+        for (Transaction tx : recent) {
+            LocalDate day = tx.getCreatedAt().toLocalDate();
+            if (counts.containsKey(day)) {
+                counts.get(day)[0]++;
+                sums.put(day, sums.get(day).add(tx.getAmount()));
+            }
+        }
+
+        List<DailyVolumeResponse> last7Days = new ArrayList<>();
+        for (LocalDate day : counts.keySet()) {
+            last7Days.add(new DailyVolumeResponse(
+                    day.toString(), counts.get(day)[0], sums.get(day)));
+        }
+
+        return new TransactionStatsResponse(transactionsToday, totalTransactions, last7Days);
     }
 
     public List<ExchangeRateResponse> getCurrentExchangeRates() {

@@ -2,6 +2,7 @@ package com.nexusbank.accountservice.controller;
 
 import com.nexusbank.accountservice.dto.request.BalanceUpdateRequest;
 import com.nexusbank.accountservice.dto.response.AccountInternalResponse;
+import com.nexusbank.accountservice.dto.response.AccountStatsResponse;
 import com.nexusbank.accountservice.dto.response.BalanceUpdateResponse;
 import com.nexusbank.accountservice.service.AccountService;
 import jakarta.validation.Valid;
@@ -32,6 +33,11 @@ public class AccountInternalController {
 
     public AccountInternalController(AccountService accountService) {
         this.accountService = accountService;
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<AccountStatsResponse> getStats() {
+        return ResponseEntity.ok(accountService.getStats());
     }
 
     @GetMapping("/by-iban/{iban}")

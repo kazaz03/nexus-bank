@@ -40,3 +40,10 @@ export interface TransactionFilters {
   from?: string;
   to?: string;
 }
+
+export interface CashTransactionRequest {
+  accountId: number;
+  amount: number;
+  reference?: string;
+  performedBy?: number;
+}

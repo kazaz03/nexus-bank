@@ -75,6 +75,13 @@ public class CustomerService {
         return toResponse(customer);
     }
 
+    /** Returns just the KYC status for a customer — used by the internal API. */
+    public String getKycStatus(Long customerId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + customerId));
+        return customer.getKycStatus().name();
+    }
+
     public CustomerResponse getCustomerByUserId(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));

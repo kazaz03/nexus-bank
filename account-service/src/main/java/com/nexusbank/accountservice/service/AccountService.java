@@ -1,9 +1,11 @@
 package com.nexusbank.accountservice.service;
 
+import com.nexusbank.accountservice.client.KycVerificationClient;
 import com.nexusbank.accountservice.dto.request.BalanceUpdateRequest;
 import com.nexusbank.accountservice.dto.request.CreateAccountRequest;
 import com.nexusbank.accountservice.dto.response.AccountInternalResponse;
 import com.nexusbank.accountservice.dto.response.AccountResponse;
+import com.nexusbank.accountservice.dto.response.AccountStatsResponse;
 import com.nexusbank.accountservice.dto.response.BalanceResponse;
 import com.nexusbank.accountservice.dto.response.BalanceUpdateResponse;
 import com.nexusbank.accountservice.exception.AccountOperationException;
@@ -28,10 +30,14 @@ public class AccountService {
 
     private final AccountRepository accountRepository;
     private final ModelMapper modelMapper;
+    private final KycVerificationClient kycVerificationClient;
 
-    public AccountService(AccountRepository accountRepository, ModelMapper modelMapper) {
+    public AccountService(AccountRepository accountRepository,
+                          ModelMapper modelMapper,
+                          KycVerificationClient kycVerificationClient) {
         this.accountRepository = accountRepository;
         this.modelMapper = modelMapper;
+        this.kycVerificationClient = kycVerificationClient;
     }
 
     @Transactional
@@ -42,6 +48,11 @@ public class AccountService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid account type: " + request.getAccountType());
         }
+
+        // KYC enforcement (F): an account may only be opened for a VERIFIED
+        // customer. Verified synchronously against User Service so the rule
+        // holds regardless of which client called us.
+        kycVerificationClient.verifyEligibleForAccountOpening(request.getCustomerId());
 
         Account account = new Account();
         account.setCustomerId(request.getCustomerId());
@@ -123,6 +134,17 @@ public class AccountService {
     public AccountInternalResponse getInternalById(Long id) {
         Account account = findById(id);
         return toInternalResponse(account);
+    }
+
+    /** Aggregate account metrics for the admin dashboard (F17). */
+    public AccountStatsResponse getStats() {
+        Account.AccountStatus active = Account.AccountStatus.ACTIVE;
+        return new AccountStatsResponse(
+                accountRepository.count(),
+                accountRepository.countByStatus(active),
+                accountRepository.countByStatusAndAccountType(active, Account.AccountType.CHECKING),
+                accountRepository.countByStatusAndAccountType(active, Account.AccountType.SAVINGS),
+                accountRepository.countByStatusAndAccountType(active, Account.AccountType.FOREIGN));
     }
 
     /**

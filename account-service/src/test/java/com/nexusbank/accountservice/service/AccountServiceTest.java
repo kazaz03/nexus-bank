@@ -1,5 +1,6 @@
 package com.nexusbank.accountservice.service;
 
+import com.nexusbank.accountservice.client.KycVerificationClient;
 import com.nexusbank.accountservice.dto.request.CreateAccountRequest;
 import com.nexusbank.accountservice.dto.response.AccountResponse;
 import com.nexusbank.accountservice.dto.response.BalanceResponse;
@@ -34,6 +35,9 @@ class AccountServiceTest {
 
     @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private KycVerificationClient kycVerificationClient;
 
     @InjectMocks
     private AccountService accountService;

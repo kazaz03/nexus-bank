@@ -7,6 +7,9 @@
     <h2>Account statement — #{{ accountId }}</h2>
     @if (statement()) {
       <button class="btn-print" (click)="printStatement()">Print / Save as PDF</button>
+      <button class="btn-pdf" (click)="downloadPdf()" [disabled]="downloadingPdf()">
+        @if (downloadingPdf()) { Preparing… } @else { Download PDF }
+      </button>
     }
   </div>
 

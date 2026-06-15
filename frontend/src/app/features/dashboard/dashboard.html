@@ -86,14 +86,98 @@
         @if (statsLoading()) {
           <p class="muted">Loading stats…</p>
         } @else if (stats(); as s) {
+
+          <!-- Key metrics -->
           <div class="stats-grid">
+            <div class="stat-card stat-card--highlight">
+              <span class="stat-label">Active accounts</span>
+              <span class="stat-value">{{ s.activeAccounts }}</span>
+              <span class="stat-sub muted">{{ s.totalAccounts }} total</span>
+            </div>
             <div class="stat-card">
-              <span class="stat-label">Total users</span>
-              <span class="stat-value">{{ s.totalUsers }}</span>
+              <span class="stat-label">Transactions today</span>
+              <span class="stat-value">{{ s.transactionsToday }}</span>
+              <span class="stat-sub muted">{{ s.totalTransactions }} all-time</span>
+            </div>
+            <div class="stat-card" [class.stat-card--warn]="s.pendingLoans > 0">
+              <span class="stat-label">Loans pending</span>
+              <span class="stat-value">{{ s.pendingLoans }}</span>
+              <span class="stat-sub muted">{{ s.totalLoans }} applications</span>
             </div>
             <div class="stat-card">
               <span class="stat-label">Customers</span>
               <span class="stat-value">{{ s.totalCustomers }}</span>
+              <span class="stat-sub muted">{{ s.activeUsers }} active users</span>
+            </div>
+          </div>
+
+          <div class="stats-panels">
+            <!-- 7-day transaction volume chart -->
+            <div class="chart-card">
+              <h3>Transaction volume — last 7 days</h3>
+              @if (maxDailyCount() === 0) {
+                <p class="muted">No transactions in the last 7 days.</p>
+              } @else {
+                <div class="bar-chart">
+                  @for (d of s.volumeLast7Days; track d.date) {
+                    <div class="bar-col">
+                      <div class="bar-wrap">
+                        <span class="bar-count">{{ d.count }}</span>
+                        <div class="bar" [style.height.%]="barHeight(d.count)"></div>
+                      </div>
+                      <span class="bar-label">{{ shortDay(d.date) }}</span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Account type distribution -->
+            <div class="chart-card">
+              <h3>Account types</h3>
+              @if (s.activeAccounts === 0) {
+                <p class="muted">No active accounts yet.</p>
+              } @else {
+                <div class="dist-list">
+                  <div class="dist-row">
+                    <span class="dist-label">Checking</span>
+                    <div class="dist-track">
+                      <div class="dist-fill dist-fill--checking" [style.width.%]="typeShare(s.checkingAccounts)"></div>
+                    </div>
+                    <span class="dist-value">{{ s.checkingAccounts }} ({{ typeShare(s.checkingAccounts) }}%)</span>
+                  </div>
+                  <div class="dist-row">
+                    <span class="dist-label">Savings</span>
+                    <div class="dist-track">
+                      <div class="dist-fill dist-fill--savings" [style.width.%]="typeShare(s.savingsAccounts)"></div>
+                    </div>
+                    <span class="dist-value">{{ s.savingsAccounts }} ({{ typeShare(s.savingsAccounts) }}%)</span>
+                  </div>
+                  <div class="dist-row">
+                    <span class="dist-label">Foreign</span>
+                    <div class="dist-track">
+                      <div class="dist-fill dist-fill--foreign" [style.width.%]="typeShare(s.foreignAccounts)"></div>
+                    </div>
+                    <span class="dist-value">{{ s.foreignAccounts }} ({{ typeShare(s.foreignAccounts) }}%)</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Secondary breakdowns -->
+          <div class="stats-grid stats-grid--secondary">
+            <div class="stat-card">
+              <span class="stat-label">Loans approved</span>
+              <span class="stat-value">{{ s.approvedLoans }}</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Loans disbursed</span>
+              <span class="stat-value">{{ s.disbursedLoans }}</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Loans rejected</span>
+              <span class="stat-value">{{ s.rejectedLoans }}</span>
             </div>
             <div class="stat-card">
               <span class="stat-label">Tellers</span>
@@ -106,10 +190,6 @@
             <div class="stat-card">
               <span class="stat-label">Admins</span>
               <span class="stat-value">{{ s.totalAdmins }}</span>
-            </div>
-            <div class="stat-card stat-card--highlight">
-              <span class="stat-label">Active users</span>
-              <span class="stat-value">{{ s.activeUsers }}</span>
             </div>
           </div>
         }
@@ -241,6 +321,79 @@
                 </div>
               }
             </div>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Cash deposit / withdrawal panel (F10) -->
+    <section class="panel">
+      <div class="panel-header" (click)="toggleCashForm()">
+        <h2>Cash deposit / withdrawal</h2>
+        <span class="toggle-icon">{{ showCashForm() ? '▲' : '▼' }}</span>
+      </div>
+
+      @if (showCashForm()) {
+        <div class="panel-body">
+          <div class="issue-form">
+            <label>
+              Customer
+              <select name="cashCustomerId" [(ngModel)]="cashCustomerId"
+                      (ngModelChange)="onCashCustomerChange()">
+                @for (c of customers(); track c.id) {
+                  <option [value]="c.id">
+                    {{ c.firstName }} {{ c.lastName }} ({{ c.email }})
+                  </option>
+                }
+              </select>
+            </label>
+
+            <label>
+              Account
+              @if (cashAccountsLoading()) {
+                <select disabled><option>Loading…</option></select>
+              } @else if (cashAccounts().length === 0) {
+                <select disabled><option>No active accounts</option></select>
+              } @else {
+                <select name="cashAccountId" [(ngModel)]="cashAccountId">
+                  @for (a of cashAccounts(); track a.id) {
+                    <option [value]="a.id">
+                      {{ a.accountType }} · {{ a.iban }} ({{ a.balance.toFixed(2) }} {{ a.currency }})
+                    </option>
+                  }
+                </select>
+              }
+            </label>
+
+            <label>
+              Amount
+              <input type="number" name="cashAmount" [(ngModel)]="cashAmount"
+                     placeholder="0.00" min="0.01" step="0.01" class="input-num" />
+            </label>
+
+            <label>
+              Reference (optional)
+              <input type="text" name="cashReference" [(ngModel)]="cashReference"
+                     placeholder="e.g. Counter deposit" />
+            </label>
+          </div>
+
+          <div class="cash-actions">
+            <button class="btn-activate" (click)="deposit()"
+                    [disabled]="cashSubmitting() || !cashAccountId">
+              @if (cashSubmitting()) { Processing… } @else { Deposit }
+            </button>
+            <button class="btn-withdraw" (click)="withdraw()"
+                    [disabled]="cashSubmitting() || !cashAccountId">
+              @if (cashSubmitting()) { Processing… } @else { Withdraw }
+            </button>
+          </div>
+
+          @if (cashError()) {
+            <p class="error">{{ cashError() }}</p>
+          }
+          @if (cashSuccess()) {
+            <p class="success-msg">{{ cashSuccess() }}</p>
           }
         </div>
       }

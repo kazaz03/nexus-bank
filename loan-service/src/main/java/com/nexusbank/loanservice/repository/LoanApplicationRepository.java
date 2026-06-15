@@ -15,6 +15,8 @@ import java.util.List;
 public interface LoanApplicationRepository extends JpaRepository<LoanApplication, Long> {
     List<LoanApplication> findByCustomerId(Long customerId);
 
+    long countByStatus(LoanApplication.LoanStatus status);
+
     @Query("""
             select l
             from LoanApplication l
