@@ -587,9 +587,24 @@ export class DashboardComponent implements OnInit {
     this.openAccountSuccess.set(null);
   }
 
+  onAccountTypeChange(): void {
+    // Foreign accounts hold a non-domestic currency; domestic accounts use BAM.
+    if (this.openAccountType === 'FOREIGN') {
+      if (this.openAccountCurrency === 'BAM') {
+        this.openAccountCurrency = 'EUR';
+      }
+    } else {
+      this.openAccountCurrency = 'BAM';
+    }
+  }
+
   openAccount(): void {
     if (!this.openAccountCustomerId) {
       this.openAccountError.set('Please select a customer.');
+      return;
+    }
+    if (this.openAccountType === 'FOREIGN' && this.openAccountCurrency === 'BAM') {
+      this.openAccountError.set('Foreign accounts must use a non-domestic currency (EUR, USD, …).');
       return;
     }
     this.openingAccount.set(true);
