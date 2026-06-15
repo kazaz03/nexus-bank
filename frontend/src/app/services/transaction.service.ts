@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
+  CashTransactionRequest,
   Transaction,
   TransactionFilters,
   TransferRequest,
@@ -40,11 +41,32 @@ export class TransactionService {
     );
   }
 
+  deposit(body: CashTransactionRequest): Observable<Transaction> {
+    return this.http.post<Transaction>(
+      `${this.apiBase}/api/transactions/deposit`,
+      body
+    );
+  }
+
+  withdraw(body: CashTransactionRequest): Observable<Transaction> {
+    return this.http.post<Transaction>(
+      `${this.apiBase}/api/transactions/withdrawal`,
+      body
+    );
+  }
+
   getStatement(accountId: number, from: string, to: string): Observable<StatementResponse> {
     const url = `${this.apiBase}/api/accounts/${accountId}/statement`
       + `?from=${encodeURIComponent(from + 'T00:00:00')}`
       + `&to=${encodeURIComponent(to + 'T23:59:59')}`;
     return this.http.get<StatementResponse>(url);
+  }
+
+  getStatementPdf(accountId: number, from: string, to: string): Observable<Blob> {
+    const url = `${this.apiBase}/api/transactions/accounts/${accountId}/statement/pdf`
+      + `?from=${encodeURIComponent(from + 'T00:00:00')}`
+      + `&to=${encodeURIComponent(to + 'T23:59:59')}`;
+    return this.http.get(url, { responseType: 'blob' });
   }
 
   getExchangeRates(): Observable<ExchangeRate[]> {

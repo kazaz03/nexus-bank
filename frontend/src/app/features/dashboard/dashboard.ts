@@ -7,6 +7,7 @@ import { RegisterCustomerRequest, UpdateCustomerRequest } from '../../services/c
 import { AccountService } from '../../services/account.service';
 import { CardService } from '../../services/card.service';
 import { AdminService } from '../../services/admin.service';
+import { TransactionService } from '../../services/transaction.service';
 import { Customer } from '../../models/customer.model';
 import { Account, CreateAccountRequest } from '../../models/account.model';
 import { DebitCard } from '../../models/card.model';
@@ -26,6 +27,7 @@ export class DashboardComponent implements OnInit {
   private accountService = inject(AccountService);
   private cardService = inject(CardService);
   private adminService = inject(AdminService);
+  private transactionService = inject(TransactionService);
   private router = inject(Router);
 
   email = this.auth.getEmail();
@@ -99,6 +101,18 @@ export class DashboardComponent implements OnInit {
   kycUpdatingId = signal<number | null>(null);
   kycError = signal<string | null>(null);
 
+  /* ── Cash deposit / withdrawal (F10 — TELLER / ADMIN) ─ */
+  showCashForm = signal(false);
+  cashCustomerId: number | null = null;
+  cashAccounts = signal<Account[]>([]);
+  cashAccountsLoading = signal(false);
+  cashAccountId: number | null = null;
+  cashAmount: number | null = null;
+  cashReference = '';
+  cashSubmitting = signal(false);
+  cashError = signal<string | null>(null);
+  cashSuccess = signal<string | null>(null);
+
   ngOnInit(): void {
     if (this.role === 'TELLER' || this.role === 'ADMIN') {
       this.loadCustomers();
@@ -168,6 +182,34 @@ export class DashboardComponent implements OnInit {
       },
       error: () => this.statsLoading.set(false)
     });
+  }
+
+  /* ── F17: admin dashboard chart helpers ──────── */
+
+  /** Largest single-day transaction count, used to scale the 7-day bars. */
+  maxDailyCount(): number {
+    const days = this.stats()?.volumeLast7Days ?? [];
+    return days.reduce((max, d) => Math.max(max, d.count), 0);
+  }
+
+  /** Bar height in percent (0–100) for a given day's transaction count. */
+  barHeight(count: number): number {
+    const max = this.maxDailyCount();
+    if (max <= 0) return 0;
+    return Math.max(4, Math.round((count / max) * 100));
+  }
+
+  /** Short weekday + day label for a chart bar, e.g. "Mon 15". */
+  shortDay(isoDate: string): string {
+    const d = new Date(isoDate + 'T00:00:00');
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit' });
+  }
+
+  /** Percentage share of an account type among active accounts. */
+  typeShare(count: number): number {
+    const total = this.stats()?.activeAccounts ?? 0;
+    if (total <= 0) return 0;
+    return Math.round((count / total) * 100);
   }
 
   /* ── F01: register new customer ──────────────── */
@@ -296,6 +338,96 @@ export class DashboardComponent implements OnInit {
         this.kycUpdatingId.set(null);
         const b = err?.error;
         this.kycError.set(b?.error || b?.message || `KYC update failed (HTTP ${err?.status ?? '?'})`);
+      }
+    });
+  }
+
+  /* ── F10: cash deposit / withdrawal ──────────── */
+  toggleCashForm(): void {
+    this.showCashForm.update(v => !v);
+    this.cashError.set(null);
+    this.cashSuccess.set(null);
+    if (this.showCashForm() && this.cashCustomerId == null && this.customers().length > 0) {
+      this.cashCustomerId = this.customers()[0].id;
+      this.loadCashAccounts(this.cashCustomerId);
+    }
+  }
+
+  onCashCustomerChange(): void {
+    this.cashAccountId = null;
+    this.cashSuccess.set(null);
+    this.cashError.set(null);
+    if (this.cashCustomerId) {
+      this.loadCashAccounts(this.cashCustomerId);
+    } else {
+      this.cashAccounts.set([]);
+    }
+  }
+
+  private loadCashAccounts(customerId: number): void {
+    this.cashAccountsLoading.set(true);
+    this.cashAccounts.set([]);
+    this.accountService.getByCustomer(customerId).subscribe({
+      next: accounts => {
+        const active = accounts.filter(a => a.status === 'ACTIVE');
+        this.cashAccounts.set(active);
+        this.cashAccountId = active.length > 0 ? active[0].id : null;
+        this.cashAccountsLoading.set(false);
+      },
+      error: () => this.cashAccountsLoading.set(false)
+    });
+  }
+
+  deposit(): void {
+    this.submitCash('deposit');
+  }
+
+  withdraw(): void {
+    this.submitCash('withdraw');
+  }
+
+  private submitCash(operation: 'deposit' | 'withdraw'): void {
+    this.cashError.set(null);
+    this.cashSuccess.set(null);
+
+    if (!this.cashAccountId) {
+      this.cashError.set('Please select an account.');
+      return;
+    }
+    if (!this.cashAmount || this.cashAmount <= 0) {
+      this.cashError.set('Amount must be greater than zero.');
+      return;
+    }
+
+    const body = {
+      accountId: this.cashAccountId,
+      amount: this.cashAmount,
+      reference: this.cashReference.trim() || undefined,
+      performedBy: this.auth.getUserId() ?? undefined
+    };
+
+    this.cashSubmitting.set(true);
+    const call = operation === 'deposit'
+      ? this.transactionService.deposit(body)
+      : this.transactionService.withdraw(body);
+
+    call.subscribe({
+      next: tx => {
+        this.cashSubmitting.set(false);
+        const verb = operation === 'deposit' ? 'Deposited' : 'Withdrew';
+        this.cashSuccess.set(
+          `${verb} ${tx.amount.toFixed(2)} ${tx.currency}. New balance: ${tx.balanceAfter.toFixed(2)} ${tx.currency}.`
+        );
+        this.cashAmount = null;
+        this.cashReference = '';
+        if (this.cashCustomerId) {
+          this.loadCashAccounts(this.cashCustomerId);
+        }
+      },
+      error: err => {
+        this.cashSubmitting.set(false);
+        const b = err?.error;
+        this.cashError.set(b?.error || b?.message || `Operation failed (HTTP ${err?.status ?? '?'})`);
       }
     });
   }

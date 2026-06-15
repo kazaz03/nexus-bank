@@ -10,6 +10,7 @@ import com.nexusbank.loanservice.dto.request.LoanApplicationRequest;
 import com.nexusbank.loanservice.dto.request.LoanApplicationPatchRequest;
 import com.nexusbank.loanservice.dto.request.LoanReviewRequest;
 import com.nexusbank.loanservice.dto.response.LoanApplicationResponse;
+import com.nexusbank.loanservice.dto.response.LoanStatsResponse;
 import com.nexusbank.loanservice.dto.response.RepaymentScheduleResponse;
 import com.nexusbank.loanservice.exception.ResourceNotFoundException;
 import com.nexusbank.loanservice.messaging.LoanEventPublisher;
@@ -67,6 +68,16 @@ public class LoanService {
 
         loanApplicationRepository.save(application);
         return toResponse(application);
+    }
+
+    /** Aggregate loan metrics for the admin dashboard (F17). */
+    public LoanStatsResponse getStats() {
+        return new LoanStatsResponse(
+                loanApplicationRepository.count(),
+                loanApplicationRepository.countByStatus(LoanApplication.LoanStatus.PENDING),
+                loanApplicationRepository.countByStatus(LoanApplication.LoanStatus.APPROVED),
+                loanApplicationRepository.countByStatus(LoanApplication.LoanStatus.DISBURSED),
+                loanApplicationRepository.countByStatus(LoanApplication.LoanStatus.REJECTED));
     }
 
     @Transactional

@@ -50,4 +50,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             Long accountId,
             LocalDateTime from,
             LocalDateTime to);
+
+    long countByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
+
+    List<Transaction> findByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
 }

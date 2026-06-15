@@ -31,6 +31,8 @@ export class StatementComponent implements OnInit {
   loading = signal(false);
   error = signal<string | null>(null);
 
+  downloadingPdf = signal(false);
+
   ngOnInit(): void {
     this.accountId = Number(this.route.snapshot.paramMap.get('accountId'));
 
@@ -96,6 +98,32 @@ export class StatementComponent implements OnInit {
   /** Opens the browser print dialog — the user can print or "Save as PDF". */
   printStatement(): void {
     window.print();
+  }
+
+  /** F16: downloads a real, server-generated PDF for the current period. */
+  downloadPdf(): void {
+    if (!this.fromDate || !this.toDate) {
+      this.error.set('Please select both start and end dates.');
+      return;
+    }
+    this.error.set(null);
+    this.downloadingPdf.set(true);
+
+    this.txService.getStatementPdf(this.accountId, this.fromDate, this.toDate).subscribe({
+      next: blob => {
+        this.downloadingPdf.set(false);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `statement-account-${this.accountId}.pdf`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: err => {
+        this.downloadingPdf.set(false);
+        this.error.set(`Failed to download PDF (HTTP ${err?.status ?? '?'})`);
+      }
+    });
   }
 
   goBack(): void {
