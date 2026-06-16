@@ -3,7 +3,9 @@ package com.nexusbank.loanservice.messaging;
 import com.nexusbank.loanservice.config.RabbitConfig;
 import com.nexusbank.loanservice.messaging.event.DisbursementCompletedEvent;
 import com.nexusbank.loanservice.messaging.event.DisbursementFailedEvent;
+import com.nexusbank.loanservice.model.LoanApplication;
 import com.nexusbank.loanservice.service.LoanService;
+import com.nexusbank.loanservice.service.NotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -14,6 +16,9 @@ import org.springframework.stereotype.Component;
  * LoanService to update the loan accordingly:
  *   - DisbursementCompletedEvent → mark loan as DISBURSED (final state)
  *   - DisbursementFailedEvent    → roll loan back to REJECTED (inverse action)
+ *
+ * After each state change a push notification is sent via SSE to both the
+ * reviewing officer and the customer so their UIs update without polling.
  */
 @Component
 public class LoanDisbursementListener {
@@ -21,9 +26,11 @@ public class LoanDisbursementListener {
     private static final Logger log = LoggerFactory.getLogger(LoanDisbursementListener.class);
 
     private final LoanService loanService;
+    private final NotificationService notificationService;
 
-    public LoanDisbursementListener(LoanService loanService) {
+    public LoanDisbursementListener(LoanService loanService, NotificationService notificationService) {
         this.loanService = loanService;
+        this.notificationService = notificationService;
     }
 
     @RabbitListener(queues = RabbitConfig.DISBURSEMENT_COMPLETED_QUEUE)
@@ -31,8 +38,10 @@ public class LoanDisbursementListener {
         log.info("Received loan.disbursement.completed: loanId={}, accountId={}, amount={}",
                 event.getLoanApplicationId(), event.getAccountId(), event.getAmountCredited());
         try {
-            loanService.markAsDisbursed(event.getLoanApplicationId());
+            LoanApplication loan = loanService.markAsDisbursed(event.getLoanApplicationId());
             log.info("Successfully marked loan {} as DISBURSED", event.getLoanApplicationId());
+            notificationService.notifyDisbursed(
+                    loan.getId(), loan.getReviewedBy(), loan.getUserId());
         } catch (Exception e) {
             log.error("Failed to mark loan {} as DISBURSED", event.getLoanApplicationId(), e);
             throw e;
@@ -43,6 +52,9 @@ public class LoanDisbursementListener {
     public void onDisbursementFailed(DisbursementFailedEvent event) {
         log.warn("Received loan.disbursement.failed: loanId={}, reason={}",
                 event.getLoanApplicationId(), event.getReason());
-        loanService.markAsRejectedAfterFailedDisbursement(event.getLoanApplicationId(), event.getReason());
+        LoanApplication loan = loanService.markAsRejectedAfterFailedDisbursement(
+                event.getLoanApplicationId(), event.getReason());
+        notificationService.notifyDisbursementFailed(
+                loan.getId(), loan.getReviewedBy(), loan.getUserId(), event.getReason());
     }
 }

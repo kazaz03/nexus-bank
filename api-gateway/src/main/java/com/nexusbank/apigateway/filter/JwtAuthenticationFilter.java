@@ -91,13 +91,22 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
+        // Primary auth: Authorization: Bearer header.
+        // Fallback: ?token= query param, accepted ONLY for the SSE subscribe path where
+        // the browser's native EventSource cannot set custom headers.
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        String token;
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else if (isSsePath(path)) {
+            token = exchange.getRequest().getQueryParams().getFirst("token");
+            if (token == null || token.isBlank()) {
+                return reject(exchange, HttpStatus.UNAUTHORIZED, "Missing token");
+            }
+        } else {
             return reject(exchange, HttpStatus.UNAUTHORIZED, "Missing or malformed Authorization header");
         }
-
-        String token = authHeader.substring(7);
 
         Claims claims;
         try {
@@ -130,6 +139,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private boolean isPublicPath(String path) {
         return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+    }
+
+    /** SSE paths where the browser's EventSource sends the token via query param instead of a header. */
+    private boolean isSsePath(String path) {
+        return path.startsWith("/api/loans/notifications/");
     }
 
     private Claims parseToken(String token) {

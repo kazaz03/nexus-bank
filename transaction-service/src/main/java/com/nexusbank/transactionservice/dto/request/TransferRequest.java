@@ -30,6 +30,4 @@ public class TransferRequest {
     @Size(max = 100)
     private String reference;
 
-    @NotNull
-    private Long initiatedBy;
 }

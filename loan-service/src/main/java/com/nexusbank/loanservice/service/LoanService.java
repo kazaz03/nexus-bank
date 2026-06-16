@@ -193,14 +193,14 @@ public class LoanService {
      * Rejection goes straight to REJECTED — no saga needed.
      */
     @Transactional
-    public LoanApplicationResponse reviewApplication(Long id, LoanReviewRequest request) {
+    public LoanApplicationResponse reviewApplication(Long id, LoanReviewRequest request, Long callerUserId) {
         LoanApplication application = findById(id);
 
         if (application.getStatus() != LoanApplication.LoanStatus.PENDING) {
             throw new IllegalStateException("Only PENDING applications can be reviewed");
         }
 
-        application.setReviewedBy(request.getReviewedBy());
+        application.setReviewedBy(callerUserId);
         application.setReviewedAt(LocalDateTime.now());
 
         if (Boolean.TRUE.equals(request.getApproved())) {
@@ -233,13 +233,13 @@ public class LoanService {
      * schedule. Idempotent — re-delivery of the event is a no-op.
      */
     @Transactional
-    public void markAsDisbursed(Long loanId) {
+    public LoanApplication markAsDisbursed(Long loanId) {
         log.info("markAsDisbursed called for loanId={}", loanId);
         LoanApplication application = findById(loanId);
         log.info("Found application: id={}, status={}", application.getId(), application.getStatus());
         if (application.getStatus() == LoanApplication.LoanStatus.DISBURSED) {
             log.info("Loan {} already DISBURSED, returning early", loanId);
-            return;
+            return application;
         }
         if (application.getStatus() != LoanApplication.LoanStatus.APPROVED) {
             log.error("Cannot mark loan {} as DISBURSED, current status is {}", loanId, application.getStatus());
@@ -252,6 +252,7 @@ public class LoanService {
         log.info("Loan {} saved with DISBURSED status", loanId);
         generateRepaymentSchedule(application);
         log.info("Repayment schedule generated for loan {}", loanId);
+        return application;
     }
 
     /**
@@ -259,10 +260,10 @@ public class LoanService {
      * back to REJECTED with the failure reason so the system stays consistent.
      */
     @Transactional
-    public void markAsRejectedAfterFailedDisbursement(Long loanId, String reason) {
+    public LoanApplication markAsRejectedAfterFailedDisbursement(Long loanId, String reason) {
         LoanApplication application = findById(loanId);
         if (application.getStatus() == LoanApplication.LoanStatus.REJECTED) {
-            return;
+            return application;
         }
         if (application.getStatus() != LoanApplication.LoanStatus.APPROVED) {
             throw new IllegalStateException(
@@ -273,6 +274,7 @@ public class LoanService {
         application.setAmountApproved(null);
         application.setInterestRate(null);
         loanApplicationRepository.save(application);
+        return application;
     }
 
     public List<RepaymentScheduleResponse> getRepaymentSchedule(Long loanId) {

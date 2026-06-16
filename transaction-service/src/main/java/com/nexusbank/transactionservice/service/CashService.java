@@ -37,17 +37,17 @@ public class CashService {
         this.transactionRepository = transactionRepository;
     }
 
-    public TransactionResponse deposit(CashTransactionRequest request) {
+    public TransactionResponse deposit(CashTransactionRequest request, Long callerUserId) {
         AccountView account = loadActiveAccount(request.getAccountId());
         String reference = buildReference("DEP", request.getReference());
 
         BalanceUpdateResult result = accountClient.credit(
                 account.getId(), request.getAmount(), reference, reference);
 
-        return persist(Transaction.TransactionType.DEPOSIT, account, request, result, reference);
+        return persist(Transaction.TransactionType.DEPOSIT, account, request, callerUserId, result, reference);
     }
 
-    public TransactionResponse withdraw(CashTransactionRequest request) {
+    public TransactionResponse withdraw(CashTransactionRequest request, Long callerUserId) {
         AccountView account = loadActiveAccount(request.getAccountId());
         String reference = buildReference("WDR", request.getReference());
 
@@ -56,7 +56,7 @@ public class CashService {
         BalanceUpdateResult result = accountClient.debit(
                 account.getId(), request.getAmount(), reference, reference);
 
-        return persist(Transaction.TransactionType.WITHDRAWAL, account, request, result, reference);
+        return persist(Transaction.TransactionType.WITHDRAWAL, account, request, callerUserId, result, reference);
     }
 
     private AccountView loadActiveAccount(Long accountId) {
@@ -72,6 +72,7 @@ public class CashService {
     public TransactionResponse persist(Transaction.TransactionType type,
                                        AccountView account,
                                        CashTransactionRequest request,
+                                       Long callerUserId,
                                        BalanceUpdateResult result,
                                        String reference) {
         LocalDateTime now = LocalDateTime.now();
@@ -85,7 +86,7 @@ public class CashService {
         tx.setCounterpartyIban(null);
         tx.setReference(reference);
         tx.setCreatedAt(now);
-        tx.setCreatedBy(request.getPerformedBy());
+        tx.setCreatedBy(callerUserId);
         tx.setStatus(Transaction.TransactionStatus.COMPLETED);
         transactionRepository.save(tx);
 
