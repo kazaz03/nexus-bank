@@ -50,9 +50,7 @@ public class AdminService {
         stats.setTotalTellers(tellerRepository.count());
         stats.setTotalLoanOfficers(loanOfficerRepository.count());
         stats.setTotalAdmins(adminRepository.count());
-        stats.setActiveUsers(userRepository.findAll().stream()
-                .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
-                .count());
+        stats.setActiveUsers(userRepository.countByIsActive(Boolean.TRUE));
 
         // ── Accounts (account-service) ──────────────────────────────
         AccountStatsView accounts = statsClient.fetchAccountStats();

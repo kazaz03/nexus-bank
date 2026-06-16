@@ -63,8 +63,9 @@ public class LoanService {
     }
 
     @Transactional
-    public LoanApplicationResponse submitApplication(LoanApplicationRequest request) {
+    public LoanApplicationResponse submitApplication(LoanApplicationRequest request, Long callerUserId) {
         LoanApplication application = createPendingApplication(request);
+        application.setUserId(callerUserId);
 
         loanApplicationRepository.save(application);
         return toResponse(application);
@@ -81,13 +82,17 @@ public class LoanService {
     }
 
     @Transactional
-    public List<LoanApplicationResponse> submitApplicationsBatch(List<LoanApplicationRequest> requests) {
+    public List<LoanApplicationResponse> submitApplicationsBatch(List<LoanApplicationRequest> requests, Long callerUserId) {
         if (requests == null || requests.isEmpty()) {
             throw new IllegalArgumentException("Batch request must contain at least one application");
         }
 
         List<LoanApplication> applications = requests.stream()
-                .map(this::createPendingApplication)
+                .map(req -> {
+                    LoanApplication app = createPendingApplication(req);
+                    app.setUserId(callerUserId);
+                    return app;
+                })
                 .toList();
 
         loanApplicationRepository.saveAll(applications);
@@ -96,8 +101,18 @@ public class LoanService {
                 .toList();
     }
 
-    public LoanApplicationResponse getApplication(Long id) {
-        return toResponse(findById(id));
+    /**
+     * Returns the loan application. CUSTOMER callers are restricted to their
+     * own applications — an attempt to fetch another customer's loan is treated
+     * as "not found" (avoids leaking IDs via 403 messages).
+     */
+    public LoanApplicationResponse getApplication(Long id, Long callerUserId, boolean isCustomer) {
+        LoanApplication application = findById(id);
+        if (isCustomer && callerUserId != null
+                && !callerUserId.equals(application.getUserId())) {
+            throw new ResourceNotFoundException("Loan not found: " + id);
+        }
+        return toResponse(application);
     }
 
     public List<LoanApplicationResponse> getApplicationsByCustomer(Long customerId) {

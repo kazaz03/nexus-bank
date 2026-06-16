@@ -83,11 +83,7 @@ public class CustomerService {
     }
 
     public CustomerResponse getCustomerByUserId(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
-        Customer customer = customerRepository.findAll().stream()
-                .filter(c -> c.getUser().getId().equals(userId))
-                .findFirst()
+        Customer customer = customerRepository.findByUser_Id(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer profile not found for user: " + userId));
         return toResponse(customer);
     }

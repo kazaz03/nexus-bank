@@ -8,4 +8,7 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
+
+    /** COUNT(*) WHERE is_active = :isActive — avoids loading all rows. */
+    long countByIsActive(Boolean isActive);
 }
