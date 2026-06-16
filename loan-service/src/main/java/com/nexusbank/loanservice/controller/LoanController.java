@@ -90,7 +90,9 @@ public class LoanController {
     @PreAuthorize("hasAnyRole('LOAN_OFFICER', 'ADMIN')")
     public ResponseEntity<LoanApplicationResponse> reviewApplication(
             @PathVariable Long id,
-            @Valid @RequestBody LoanReviewRequest request) {
+            @Valid @RequestBody LoanReviewRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        if (userId != null) request.setReviewedBy(userId);   // reviewing officer from the JWT, not the client body
         return ResponseEntity.ok(loanService.reviewApplication(id, request));
     }
 

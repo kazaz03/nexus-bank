@@ -23,7 +23,9 @@ public class DebitCardController {
     @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
     public ResponseEntity<DebitCardResponse> issueCard(
             @PathVariable Long accountId,
-            @RequestBody IssueDebitCardRequest request) {
+            @RequestBody IssueDebitCardRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        if (userId != null) request.setIssuedBy(userId);   // issuing teller from the JWT, not the client body
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(debitCardService.issueCard(accountId, request));
     }

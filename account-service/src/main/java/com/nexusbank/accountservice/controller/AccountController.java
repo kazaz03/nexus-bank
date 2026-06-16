@@ -24,7 +24,10 @@ public class AccountController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
-    public ResponseEntity<AccountResponse> createAccount(@Valid @RequestBody CreateAccountRequest request) {
+    public ResponseEntity<AccountResponse> createAccount(
+            @Valid @RequestBody CreateAccountRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        if (userId != null) request.setCreatedBy(userId);   // opening teller from the JWT, not the client body
         return ResponseEntity.status(HttpStatus.CREATED).body(accountService.createAccount(request));
     }
 
@@ -50,7 +53,10 @@ public class AccountController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AccountResponse> closeAccount(
             @PathVariable Long id,
-            @RequestParam(required = false) Long closedBy) {
-        return ResponseEntity.ok(accountService.closeAccount(id, closedBy));
+            @RequestParam(required = false) Long closedBy,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        // Closing admin from the JWT; fall back to the query param for internal/test calls.
+        Long actor = userId != null ? userId : closedBy;
+        return ResponseEntity.ok(accountService.closeAccount(id, actor));
     }
 }

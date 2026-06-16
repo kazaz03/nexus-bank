@@ -47,7 +47,10 @@ public class TransactionController {
 
     @PostMapping("/transactions/transfer")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
-    public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request) {
+    public ResponseEntity<TransferResponse> transfer(
+            @Valid @RequestBody TransferRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        if (userId != null) request.setAuditUserId(userId);   // actor from the JWT, not the client body
         TransferResponse response = transferService.transfer(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -55,14 +58,20 @@ public class TransactionController {
     /** F10: teller deposits cash onto a customer's account. */
     @PostMapping("/transactions/deposit")
     @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
-    public ResponseEntity<TransactionResponse> deposit(@Valid @RequestBody CashTransactionRequest request) {
+    public ResponseEntity<TransactionResponse> deposit(
+            @Valid @RequestBody CashTransactionRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        if (userId != null) request.setPerformedBy(userId);   // actor from the JWT, not the client body
         return ResponseEntity.status(HttpStatus.CREATED).body(cashService.deposit(request));
     }
 
     /** F10: teller withdraws cash from a customer's account. */
     @PostMapping("/transactions/withdrawal")
     @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
-    public ResponseEntity<TransactionResponse> withdrawal(@Valid @RequestBody CashTransactionRequest request) {
+    public ResponseEntity<TransactionResponse> withdrawal(
+            @Valid @RequestBody CashTransactionRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        if (userId != null) request.setPerformedBy(userId);   // actor from the JWT, not the client body
         return ResponseEntity.status(HttpStatus.CREATED).body(cashService.withdraw(request));
     }
 

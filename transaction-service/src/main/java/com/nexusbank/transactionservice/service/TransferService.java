@@ -178,7 +178,7 @@ public class TransferService {
         debit.setReference(reference);
         debit.setExchangeRate(appliedRate);
         debit.setCreatedAt(now);
-        debit.setCreatedBy(request.getInitiatedBy());
+        debit.setCreatedBy(auditActor(request));
         debit.setStatus(Transaction.TransactionStatus.COMPLETED);
         transactionRepository.save(debit);
 
@@ -192,7 +192,7 @@ public class TransferService {
         credit.setReference(reference);
         credit.setExchangeRate(appliedRate);
         credit.setCreatedAt(now);
-        credit.setCreatedBy(request.getInitiatedBy());
+        credit.setCreatedBy(auditActor(request));
         credit.setStatus(Transaction.TransactionStatus.COMPLETED);
         transactionRepository.save(credit);
 
@@ -220,5 +220,14 @@ public class TransferService {
             return "TRX-" + suffix;
         }
         return "TRX-" + suffix + "-" + userSupplied.replaceAll("\\s+", "_");
+    }
+
+    /**
+     * Audit actor for the persisted records: the authenticated user id supplied by
+     * the controller from the JWT. Falls back to the initiator for contexts where no
+     * token header is present (e.g. internal/unit tests).
+     */
+    private Long auditActor(TransferRequest request) {
+        return request.getAuditUserId() != null ? request.getAuditUserId() : request.getInitiatedBy();
     }
 }

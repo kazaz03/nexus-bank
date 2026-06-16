@@ -30,6 +30,14 @@ public class TransferRequest {
     @Size(max = 100)
     private String reference;
 
+    /** Customer identity of the initiator — used to verify source-account ownership. */
     @NotNull
     private Long initiatedBy;
+
+    /**
+     * User id of the authenticated actor, taken from the JWT (X-User-Id header) by
+     * the controller — never trusted from the client body. Recorded as createdBy on
+     * the persisted DEBIT/CREDIT records (audit).
+     */
+    private Long auditUserId;
 }
