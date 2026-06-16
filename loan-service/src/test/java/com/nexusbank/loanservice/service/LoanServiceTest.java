@@ -103,7 +103,7 @@ class LoanServiceTest {
         when(loanApplicationRepository.save(any(LoanApplication.class))).thenReturn(pendingLoan);
         when(modelMapper.map(any(LoanApplication.class), eq(LoanApplicationResponse.class))).thenReturn(loanResponse);
 
-        LoanApplicationResponse result = loanService.submitApplication(request);
+        LoanApplicationResponse result = loanService.submitApplication(request, null);
 
         assertThat(result).isNotNull();
         verify(loanApplicationRepository).save(argThat(l ->
@@ -131,7 +131,7 @@ class LoanServiceTest {
         when(loanApplicationRepository.saveAll(any())).thenReturn(List.of(pendingLoan));
         when(modelMapper.map(any(LoanApplication.class), eq(LoanApplicationResponse.class))).thenReturn(loanResponse);
 
-        List<LoanApplicationResponse> result = loanService.submitApplicationsBatch(List.of(requestOne, requestTwo));
+        List<LoanApplicationResponse> result = loanService.submitApplicationsBatch(List.of(requestOne, requestTwo), null);
 
         assertThat(result).hasSize(2);
         verify(loanApplicationRepository).saveAll(argThat(list -> ((List<?>) list).size() == 2));
@@ -139,7 +139,7 @@ class LoanServiceTest {
 
     @Test
     void submitApplicationsBatch_withEmptyInput_throwsIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () -> loanService.submitApplicationsBatch(List.of()));
+        assertThrows(IllegalArgumentException.class, () -> loanService.submitApplicationsBatch(List.of(), null));
         verify(loanApplicationRepository, never()).saveAll(any());
     }
 
@@ -150,7 +150,7 @@ class LoanServiceTest {
         when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(pendingLoan));
         when(modelMapper.map(pendingLoan, LoanApplicationResponse.class)).thenReturn(loanResponse);
 
-        LoanApplicationResponse result = loanService.getApplication(1L);
+        LoanApplicationResponse result = loanService.getApplication(1L, null, false);
 
         assertThat(result.getId()).isEqualTo(1L);
     }
@@ -159,7 +159,7 @@ class LoanServiceTest {
     void getApplication_whenNotFound_throwsResourceNotFoundException() {
         when(loanApplicationRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> loanService.getApplication(99L));
+        assertThrows(ResourceNotFoundException.class, () -> loanService.getApplication(99L, null, false));
     }
 
     // ── getAllApplications ────────────────────────────────────────────────────
@@ -266,7 +266,6 @@ class LoanServiceTest {
         request.setApproved(true);
         request.setAmountApproved(BigDecimal.valueOf(5000));
         request.setInterestRate(BigDecimal.valueOf(6.0));
-        request.setReviewedBy(5L);
 
         when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(pendingLoan));
         when(loanApplicationRepository.save(any())).thenReturn(pendingLoan);
@@ -277,7 +276,7 @@ class LoanServiceTest {
         when(modelMapper.map(any(LoanApplication.class), eq(LoanApplicationResponse.class)))
                 .thenReturn(approvedResponse);
 
-        LoanApplicationResponse result = loanService.reviewApplication(1L, request);
+        LoanApplicationResponse result = loanService.reviewApplication(1L, request, 5L);
 
         assertThat(result.getStatus()).isEqualTo("APPROVED");
         verify(loanApplicationRepository).save(argThat(l ->
@@ -330,12 +329,11 @@ class LoanServiceTest {
         request.setApproved(true);
         request.setAmountApproved(null);
         request.setInterestRate(null);
-        request.setReviewedBy(5L);
 
         when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(pendingLoan));
 
         assertThrows(IllegalArgumentException.class,
-                () -> loanService.reviewApplication(1L, request));
+                () -> loanService.reviewApplication(1L, request, null));
     }
 
     @Test
@@ -343,7 +341,6 @@ class LoanServiceTest {
         LoanReviewRequest request = new LoanReviewRequest();
         request.setApproved(false);
         request.setRejectionReason("Insufficient income");
-        request.setReviewedBy(5L);
 
         when(loanApplicationRepository.findById(1L)).thenReturn(Optional.of(pendingLoan));
         when(loanApplicationRepository.save(any())).thenReturn(pendingLoan);
@@ -354,7 +351,7 @@ class LoanServiceTest {
         when(modelMapper.map(any(LoanApplication.class), eq(LoanApplicationResponse.class)))
                 .thenReturn(rejectedResponse);
 
-        LoanApplicationResponse result = loanService.reviewApplication(1L, request);
+        LoanApplicationResponse result = loanService.reviewApplication(1L, request, 5L);
 
         assertThat(result.getStatus()).isEqualTo("REJECTED");
         verify(loanApplicationRepository).save(argThat(l ->
@@ -368,10 +365,9 @@ class LoanServiceTest {
 
         LoanReviewRequest request = new LoanReviewRequest();
         request.setApproved(true);
-        request.setReviewedBy(5L);
 
         assertThrows(IllegalStateException.class,
-                () -> loanService.reviewApplication(1L, request));
+                () -> loanService.reviewApplication(1L, request, 5L));
     }
 
     // ── getRepaymentSchedule ──────────────────────────────────────────────────

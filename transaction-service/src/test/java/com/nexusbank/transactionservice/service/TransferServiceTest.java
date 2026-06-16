@@ -1,6 +1,7 @@
 package com.nexusbank.transactionservice.service;
 
 import com.nexusbank.transactionservice.client.AccountClient;
+import com.nexusbank.transactionservice.client.UserInternalClient;
 import com.nexusbank.transactionservice.client.dto.AccountView;
 import com.nexusbank.transactionservice.client.dto.BalanceUpdateResult;
 import com.nexusbank.transactionservice.dto.request.TransferRequest;
@@ -46,6 +47,9 @@ class TransferServiceTest {
     private AccountClient accountClient;
 
     @Mock
+    private UserInternalClient userInternalClient;
+
+    @Mock
     private TransactionRepository transactionRepository;
 
     @Mock
@@ -73,7 +77,6 @@ class TransferServiceTest {
         request.setTargetIban(target.getIban());
         request.setAmount(BigDecimal.valueOf(250));
         request.setReference("Rent March 2026");
-        request.setInitiatedBy(source.getCustomerId());
         return request;
     }
 
@@ -94,7 +97,7 @@ class TransferServiceTest {
         when(accountClient.credit(eq(target.getId()), eq(BigDecimal.valueOf(250)), anyString(), anyString()))
                 .thenReturn(creditResult);
 
-        TransferResponse result = transferService.transfer(validRequest());
+        TransferResponse result = transferService.transfer(validRequest(), null);
 
         assertThat(result.getStatus()).isEqualTo("COMPLETED");
         assertThat(result.getSourceCurrency()).isEqualTo("BAM");
@@ -135,7 +138,7 @@ class TransferServiceTest {
         TransferRequest request = validRequest();
         request.setAmount(new BigDecimal("250"));
 
-        TransferResponse result = transferService.transfer(request);
+        TransferResponse result = transferService.transfer(request, null);
 
         // 250 EUR * 1.955830 = 488.9575 → rounded HALF_UP to 488.96
         assertThat(result.getTargetAmount()).isEqualByComparingTo(new BigDecimal("488.96"));
@@ -149,7 +152,7 @@ class TransferServiceTest {
         TransferRequest request = validRequest();
         request.setTargetIban(request.getSourceIban());
 
-        assertThatThrownBy(() -> transferService.transfer(request))
+        assertThatThrownBy(() -> transferService.transfer(request, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Source and target IBAN must differ");
 
@@ -162,7 +165,7 @@ class TransferServiceTest {
         when(accountClient.getByIban(source.getIban(), false)).thenReturn(source);
         when(accountClient.getByIban(target.getIban(), false)).thenReturn(target);
 
-        assertThatThrownBy(() -> transferService.transfer(validRequest()))
+        assertThatThrownBy(() -> transferService.transfer(validRequest(), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Source account is not active");
 
@@ -175,7 +178,7 @@ class TransferServiceTest {
         when(accountClient.getByIban(source.getIban(), false)).thenReturn(source);
         when(accountClient.getByIban(target.getIban(), false)).thenReturn(target);
 
-        assertThatThrownBy(() -> transferService.transfer(validRequest()))
+        assertThatThrownBy(() -> transferService.transfer(validRequest(), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Target account is not active");
 
@@ -184,13 +187,12 @@ class TransferServiceTest {
 
     @Test
     void transfer_initiatorNotOwner_throws() {
-        TransferRequest request = validRequest();
-        request.setInitiatedBy(999L); // not the source account's customer
-
+        // callerUserId=999 but the source account is owned by userId=100
         when(accountClient.getByIban(source.getIban(), false)).thenReturn(source);
         when(accountClient.getByIban(target.getIban(), false)).thenReturn(target);
+        when(userInternalClient.resolveUserId(source.getCustomerId())).thenReturn(100L);
 
-        assertThatThrownBy(() -> transferService.transfer(request))
+        assertThatThrownBy(() -> transferService.transfer(validRequest(), 999L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Initiator does not own");
     }
@@ -205,7 +207,7 @@ class TransferServiceTest {
         TransferRequest request = validRequest();
         request.setAmount(BigDecimal.valueOf(250));
 
-        assertThatThrownBy(() -> transferService.transfer(request))
+        assertThatThrownBy(() -> transferService.transfer(request, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Insufficient funds");
 
@@ -219,7 +221,7 @@ class TransferServiceTest {
         when(accountClient.getByIban(source.getIban(), false)).thenReturn(source);
         when(accountClient.getByIban(target.getIban(), false)).thenReturn(target);
 
-        assertThatThrownBy(() -> transferService.transfer(validRequest()))
+        assertThatThrownBy(() -> transferService.transfer(validRequest(), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SAVINGS account are restricted");
     }
@@ -234,7 +236,7 @@ class TransferServiceTest {
                         eq("USD"), eq("BAM"), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(List.of()); // no rate found
 
-        assertThatThrownBy(() -> transferService.transfer(validRequest()))
+        assertThatThrownBy(() -> transferService.transfer(validRequest(), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("No active exchange rate");
 
@@ -250,7 +252,7 @@ class TransferServiceTest {
         when(accountClient.debit(anyLong(), any(), anyString(), anyString()))
                 .thenThrow(new AccountServiceException("Insufficient funds", false, HttpStatus.UNPROCESSABLE_ENTITY));
 
-        assertThatThrownBy(() -> transferService.transfer(validRequest()))
+        assertThatThrownBy(() -> transferService.transfer(validRequest(), null))
                 .isInstanceOf(AccountServiceException.class);
 
         // No credit attempt, no compensation, no persistence.
@@ -272,7 +274,7 @@ class TransferServiceTest {
         when(accountClient.credit(eq(source.getId()), any(), anyString(), anyString()))
                 .thenReturn(new BalanceUpdateResult(source.getId(), source.getIban(), "BAM", BigDecimal.valueOf(1000)));
 
-        assertThatThrownBy(() -> transferService.transfer(validRequest()))
+        assertThatThrownBy(() -> transferService.transfer(validRequest(), null))
                 .isInstanceOf(AccountServiceException.class)
                 .hasMessageContaining("source account refunded");
 
@@ -293,7 +295,7 @@ class TransferServiceTest {
         when(accountClient.credit(eq(source.getId()), any(), anyString(), anyString()))
                 .thenReturn(new BalanceUpdateResult(source.getId(), source.getIban(), "BAM", BigDecimal.valueOf(1000)));
 
-        assertThatThrownBy(() -> transferService.transfer(validRequest()))
+        assertThatThrownBy(() -> transferService.transfer(validRequest(), null))
                 .isInstanceOf(AccountServiceException.class)
                 .matches(ex -> ((AccountServiceException) ex).isRetryable(),
                         "exception should be marked retryable");

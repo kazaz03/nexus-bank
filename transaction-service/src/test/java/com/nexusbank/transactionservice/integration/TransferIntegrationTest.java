@@ -237,7 +237,6 @@ class TransferIntegrationTest {
         r.setTargetIban(TARGET_IBAN);
         r.setAmount(amount != null ? new BigDecimal(amount) : null);
         r.setReference("Integration Test Transfer");
-        r.setInitiatedBy(CUSTOMER_ID);
         return r;
     }
 

@@ -119,7 +119,7 @@ class AccountControllerTest {
         request.setCustomerId(10L);
         request.setAccountType("CHECKING");
 
-        when(accountService.createAccount(any(CreateAccountRequest.class))).thenReturn(sampleResponse);
+        when(accountService.createAccount(any(CreateAccountRequest.class), any())).thenReturn(sampleResponse);
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -147,7 +147,7 @@ class AccountControllerTest {
         request.setCustomerId(10L);
         request.setAccountType("BOGUS");
 
-        when(accountService.createAccount(any())).thenThrow(new IllegalArgumentException("Invalid account type: BOGUS"));
+        when(accountService.createAccount(any(), any())).thenThrow(new IllegalArgumentException("Invalid account type: BOGUS"));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)

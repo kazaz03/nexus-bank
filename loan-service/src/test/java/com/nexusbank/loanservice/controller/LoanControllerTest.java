@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -72,7 +73,7 @@ class LoanControllerTest {
         request.setTermMonths(12);
         request.setPurpose("Home renovation");
 
-        when(loanService.submitApplication(any(LoanApplicationRequest.class))).thenReturn(sampleResponse);
+        when(loanService.submitApplication(any(LoanApplicationRequest.class), any())).thenReturn(sampleResponse);
 
         mockMvc.perform(post("/api/loans")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -131,7 +132,7 @@ class LoanControllerTest {
         secondResponse.setId(2L);
         secondResponse.setStatus("PENDING");
 
-        when(loanService.submitApplicationsBatch(any())).thenReturn(List.of(sampleResponse, secondResponse));
+        when(loanService.submitApplicationsBatch(any(), any())).thenReturn(List.of(sampleResponse, secondResponse));
 
         mockMvc.perform(post("/api/loans/batch")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -143,7 +144,7 @@ class LoanControllerTest {
 
     @Test
     void submitApplicationsBatch_withEmptyList_returns400() throws Exception {
-        when(loanService.submitApplicationsBatch(any()))
+        when(loanService.submitApplicationsBatch(any(), any()))
                 .thenThrow(new IllegalArgumentException("Batch request must contain at least one application"));
 
         mockMvc.perform(post("/api/loans/batch")
@@ -183,7 +184,7 @@ class LoanControllerTest {
 
     @Test
     void getApplication_whenFound_returns200() throws Exception {
-        when(loanService.getApplication(1L)).thenReturn(sampleResponse);
+        when(loanService.getApplication(eq(1L), any(), anyBoolean())).thenReturn(sampleResponse);
 
         mockMvc.perform(get("/api/loans/1"))
                 .andExpect(status().isOk())
@@ -193,7 +194,7 @@ class LoanControllerTest {
 
     @Test
     void getApplication_whenNotFound_returns404() throws Exception {
-        when(loanService.getApplication(99L))
+        when(loanService.getApplication(eq(99L), any(), anyBoolean()))
                 .thenThrow(new ResourceNotFoundException("Loan application not found: 99"));
 
         mockMvc.perform(get("/api/loans/99"))
@@ -253,18 +254,17 @@ class LoanControllerTest {
         request.setApproved(true);
         request.setAmountApproved(BigDecimal.valueOf(5000));
         request.setInterestRate(BigDecimal.valueOf(6.5));
-        request.setReviewedBy(5L);
 
         LoanApplicationResponse approved = new LoanApplicationResponse();
         approved.setId(1L);
         approved.setStatus("APPROVED");
 
-        when(loanService.reviewApplication(eq(1L), any(LoanReviewRequest.class))).thenReturn(approved);
+        when(loanService.reviewApplication(eq(1L), any(LoanReviewRequest.class), any())).thenReturn(approved);
 
         mockMvc.perform(post("/api/loans/1/review")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isAccepted())   // 202 — disbursement saga started
                 .andExpect(jsonPath("$.status").value("APPROVED"));
     }
 
@@ -272,9 +272,8 @@ class LoanControllerTest {
     void reviewApplication_whenAlreadyReviewed_returns422() throws Exception {
         LoanReviewRequest request = new LoanReviewRequest();
         request.setApproved(true);
-        request.setReviewedBy(5L);
 
-        when(loanService.reviewApplication(eq(1L), any()))
+        when(loanService.reviewApplication(eq(1L), any(), any()))
                 .thenThrow(new IllegalStateException("Only PENDING applications can be reviewed"));
 
         mockMvc.perform(post("/api/loans/1/review")

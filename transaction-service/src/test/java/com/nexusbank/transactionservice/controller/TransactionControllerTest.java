@@ -6,6 +6,8 @@ import com.nexusbank.transactionservice.dto.response.StatementResponse;
 import com.nexusbank.transactionservice.dto.response.TransactionResponse;
 import com.nexusbank.transactionservice.exception.GlobalExceptionHandler;
 import com.nexusbank.transactionservice.exception.ResourceNotFoundException;
+import com.nexusbank.transactionservice.service.CashService;
+import com.nexusbank.transactionservice.service.StatementPdfService;
 import com.nexusbank.transactionservice.service.TransactionService;
 import com.nexusbank.transactionservice.service.TransferService;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +43,12 @@ class TransactionControllerTest {
 
     @MockBean
     private TransferService transferService;
+
+    @MockBean
+    private CashService cashService;
+
+    @MockBean
+    private StatementPdfService statementPdfService;
 
     @Autowired
     private ObjectMapper objectMapper;

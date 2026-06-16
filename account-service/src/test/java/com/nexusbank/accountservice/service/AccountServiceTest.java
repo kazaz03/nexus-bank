@@ -128,7 +128,7 @@ class AccountServiceTest {
         when(accountRepository.save(any(Account.class))).thenReturn(sampleAccount);
         when(modelMapper.map(any(Account.class), eq(AccountResponse.class))).thenReturn(sampleResponse);
 
-        AccountResponse result = accountService.createAccount(request);
+        AccountResponse result = accountService.createAccount(request, null);
 
         assertThat(result).isNotNull();
         verify(accountRepository).save(any(Account.class));
@@ -140,7 +140,7 @@ class AccountServiceTest {
         request.setCustomerId(10L);
         request.setAccountType("INVALID_TYPE");
 
-        assertThrows(IllegalArgumentException.class, () -> accountService.createAccount(request));
+        assertThrows(IllegalArgumentException.class, () -> accountService.createAccount(request, null));
         verify(accountRepository, never()).save(any());
     }
 

@@ -257,7 +257,6 @@ class LoanLifecycleIntegrationTest {
 
         LoanReviewRequest review = new LoanReviewRequest();
         review.setApproved(true);
-        review.setReviewedBy(99L);
         // amountApproved and interestRate intentionally missing
 
         ResponseEntity<String> response = restTemplate.postForEntity(
@@ -276,7 +275,6 @@ class LoanLifecycleIntegrationTest {
         LoanReviewRequest review = new LoanReviewRequest();
         review.setApproved(false);
         review.setRejectionReason("Insufficient credit score");
-        review.setReviewedBy(88L);
 
         ResponseEntity<LoanApplicationResponse> response = restTemplate.postForEntity(
                 "/api/loans/" + created.getId() + "/review", review,
@@ -298,7 +296,6 @@ class LoanLifecycleIntegrationTest {
         LoanReviewRequest review = new LoanReviewRequest();
         review.setApproved(false);
         review.setRejectionReason("Changed my mind");
-        review.setReviewedBy(99L);
 
         ResponseEntity<String> response = restTemplate.postForEntity(
                 "/api/loans/" + created.getId() + "/review", review, String.class);
@@ -433,12 +430,11 @@ class LoanLifecycleIntegrationTest {
     private ResponseEntity<LoanApplicationResponse> approve(Long loanId,
                                                              String amountApproved,
                                                              String interestRate,
-                                                             Long reviewedBy) {
+                                                             @SuppressWarnings("unused") Long reviewedBy) {
         LoanReviewRequest review = new LoanReviewRequest();
         review.setApproved(true);
         review.setAmountApproved(new BigDecimal(amountApproved));
         review.setInterestRate(new BigDecimal(interestRate));
-        review.setReviewedBy(reviewedBy);
         return restTemplate.postForEntity(
                 "/api/loans/" + loanId + "/review", review, LoanApplicationResponse.class);
     }
