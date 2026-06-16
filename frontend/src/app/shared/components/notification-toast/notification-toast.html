@@ -1,0 +1,9 @@
+<div class="toast-container" aria-live="polite">
+  @for (n of notifications(); track $index) {
+    <div class="toast" [ngClass]="cssClass(n.type)">
+      <span class="toast__icon">{{ icon(n.type) }}</span>
+      <span class="toast__message">{{ n.message }}</span>
+      <button class="toast__close" (click)="dismiss($index)" aria-label="Dismiss">✕</button>
+    </div>
+  }
+</div>

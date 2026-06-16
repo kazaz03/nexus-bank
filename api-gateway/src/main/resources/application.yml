@@ -69,6 +69,15 @@ spring:
             - Path=/api/transactions/**, /api/exchange-rates/**
 
         # ── loan-service ─────────────────────────────────────────────────────
+        # SSE route must come first — it needs a long response timeout so the
+        # gateway does not close the streaming connection after the default interval.
+        - id: loan-service-sse
+          uri: lb://loan-service
+          predicates:
+            - Path=/api/loans/notifications/**
+          metadata:
+            response-timeout: 3600000   # 1 hour in ms
+
         - id: loan-service
           uri: lb://loan-service
           predicates:

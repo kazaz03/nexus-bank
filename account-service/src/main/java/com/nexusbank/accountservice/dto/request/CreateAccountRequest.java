@@ -20,5 +20,4 @@ public class CreateAccountRequest {
 
     private BigDecimal interestRate;
 
-    private Long createdBy;
 }

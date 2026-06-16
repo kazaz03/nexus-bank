@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 /**
  * Internal API for inter-service calls only — not routed through the public
  * API gateway. Account Service calls this to enforce KYC before opening an
@@ -27,5 +29,15 @@ class CustomerInternalController {
     public ResponseEntity<KycStatusResponse> getKycStatus(@PathVariable Long customerId) {
         return ResponseEntity.ok(
                 new KycStatusResponse(customerId, customerService.getKycStatus(customerId)));
+    }
+
+    /**
+     * Resolves a customer profile ID → the owning User's ID.
+     * Used by transaction-service to verify transfer ownership against the JWT subject.
+     */
+    @GetMapping("/{customerId}/user-id")
+    public ResponseEntity<Map<String, Long>> getUserId(@PathVariable Long customerId) {
+        Long userId = customerService.getCustomer(customerId).getUserId();
+        return ResponseEntity.ok(Map.of("userId", userId));
     }
 }

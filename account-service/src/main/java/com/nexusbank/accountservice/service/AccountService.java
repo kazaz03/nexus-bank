@@ -41,7 +41,7 @@ public class AccountService {
     }
 
     @Transactional
-    public AccountResponse createAccount(CreateAccountRequest request) {
+    public AccountResponse createAccount(CreateAccountRequest request, Long callerUserId) {
         Account.AccountType accountType;
         try {
             accountType = Account.AccountType.valueOf(request.getAccountType().toUpperCase());
@@ -62,7 +62,7 @@ public class AccountService {
         account.setBalance(BigDecimal.ZERO);
         account.setStatus(Account.AccountStatus.ACTIVE);
         account.setCreatedAt(LocalDateTime.now());
-        account.setCreatedBy(request.getCreatedBy());
+        account.setCreatedBy(callerUserId);
 
         if (accountType == Account.AccountType.CHECKING && request.getOverdraftLimit() != null) {
             account.setOverdraftLimit(request.getOverdraftLimit());

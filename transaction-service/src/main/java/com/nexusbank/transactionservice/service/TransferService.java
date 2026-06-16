@@ -1,6 +1,7 @@
 package com.nexusbank.transactionservice.service;
 
 import com.nexusbank.transactionservice.client.AccountClient;
+import com.nexusbank.transactionservice.client.UserInternalClient;
 import com.nexusbank.transactionservice.client.dto.AccountView;
 import com.nexusbank.transactionservice.client.dto.BalanceUpdateResult;
 import com.nexusbank.transactionservice.dto.request.TransferRequest;
@@ -46,18 +47,21 @@ public class TransferService {
     private static final Logger log = LoggerFactory.getLogger(TransferService.class);
 
     private final AccountClient accountClient;
+    private final UserInternalClient userInternalClient;
     private final TransactionRepository transactionRepository;
     private final ExchangeRateRepository exchangeRateRepository;
 
     public TransferService(AccountClient accountClient,
+                           UserInternalClient userInternalClient,
                            TransactionRepository transactionRepository,
                            ExchangeRateRepository exchangeRateRepository) {
         this.accountClient = accountClient;
+        this.userInternalClient = userInternalClient;
         this.transactionRepository = transactionRepository;
         this.exchangeRateRepository = exchangeRateRepository;
     }
 
-    public TransferResponse transfer(TransferRequest request) {
+    public TransferResponse transfer(TransferRequest request, Long callerUserId) {
         if (request.getSourceIban().equalsIgnoreCase(request.getTargetIban())) {
             throw new IllegalArgumentException("Source and target IBAN must differ");
         }
@@ -66,7 +70,7 @@ public class TransferService {
         // ── Phase 1: read-and-validate both accounts ─────────────────────
         AccountView source = accountClient.getByIban(request.getSourceIban(), false);
         AccountView target = accountClient.getByIban(request.getTargetIban(), false);
-        validateAccountsForTransfer(source, target, request);
+        validateAccountsForTransfer(source, target, request.getAmount(), callerUserId);
 
         // ── Phase 2: resolve exchange rate when currencies differ ────────
         BigDecimal targetAmount = request.getAmount();
@@ -105,25 +109,31 @@ public class TransferService {
         // ── Phase 5: persist matched DEBIT + CREDIT records locally ──────
         return persistTransferRecords(
                 request, source, target, appliedRate, targetAmount,
-                debitResult, creditResult, reference);
+                debitResult, creditResult, reference, callerUserId);
     }
 
-    private void validateAccountsForTransfer(AccountView source, AccountView target, TransferRequest request) {
+    private void validateAccountsForTransfer(AccountView source, AccountView target,
+                                              BigDecimal amount, Long callerUserId) {
         if (!"ACTIVE".equalsIgnoreCase(source.getStatus())) {
             throw new IllegalArgumentException("Source account is not active (status=" + source.getStatus() + ")");
         }
         if (!"ACTIVE".equalsIgnoreCase(target.getStatus())) {
             throw new IllegalArgumentException("Target account is not active (status=" + target.getStatus() + ")");
         }
-        if (!request.getInitiatedBy().equals(source.getCustomerId())) {
-            // Ownership check — proxies what would be JWT subject validation.
-            throw new IllegalArgumentException("Initiator does not own the source account");
+        // Ownership check: resolve the source account's owner userId via User Service
+        // so the check is grounded in the verified JWT subject, not a client-supplied field.
+        // Staff roles (TELLER/ADMIN) may have a null callerUserId — they bypass ownership.
+        if (callerUserId != null) {
+            Long ownerUserId = userInternalClient.resolveUserId(source.getCustomerId());
+            if (!callerUserId.equals(ownerUserId)) {
+                throw new IllegalArgumentException("Initiator does not own the source account");
+            }
         }
         BigDecimal overdraft = source.getOverdraftLimit() != null ? source.getOverdraftLimit() : BigDecimal.ZERO;
         BigDecimal availableFunds = source.getBalance().add(overdraft);
-        if (availableFunds.compareTo(request.getAmount()) < 0) {
+        if (availableFunds.compareTo(amount) < 0) {
             throw new IllegalArgumentException(
-                    "Insufficient funds on source account (available=" + availableFunds + ", requested=" + request.getAmount() + ")");
+                    "Insufficient funds on source account (available=" + availableFunds + ", requested=" + amount + ")");
         }
         if ("SAVINGS".equalsIgnoreCase(target.getAccountType())
                 && !target.getCustomerId().equals(source.getCustomerId())) {
@@ -165,7 +175,8 @@ public class TransferService {
                                                    BigDecimal targetAmount,
                                                    BalanceUpdateResult debitResult,
                                                    BalanceUpdateResult creditResult,
-                                                   String reference) {
+                                                   String reference,
+                                                   Long callerUserId) {
         LocalDateTime now = LocalDateTime.now();
 
         Transaction debit = new Transaction();
@@ -178,7 +189,7 @@ public class TransferService {
         debit.setReference(reference);
         debit.setExchangeRate(appliedRate);
         debit.setCreatedAt(now);
-        debit.setCreatedBy(request.getInitiatedBy());
+        debit.setCreatedBy(callerUserId);
         debit.setStatus(Transaction.TransactionStatus.COMPLETED);
         transactionRepository.save(debit);
 
@@ -192,7 +203,7 @@ public class TransferService {
         credit.setReference(reference);
         credit.setExchangeRate(appliedRate);
         credit.setCreatedAt(now);
-        credit.setCreatedBy(request.getInitiatedBy());
+        credit.setCreatedBy(callerUserId);
         credit.setStatus(Transaction.TransactionStatus.COMPLETED);
         transactionRepository.save(credit);
 

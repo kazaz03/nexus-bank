@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -47,23 +48,29 @@ public class TransactionController {
 
     @PostMapping("/transactions/transfer")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
-    public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request) {
-        TransferResponse response = transferService.transfer(request);
+    public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request,
+                                                     Authentication auth) {
+        Long callerUserId = parseUserId(auth);
+        TransferResponse response = transferService.transfer(request, callerUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /** F10: teller deposits cash onto a customer's account. */
     @PostMapping("/transactions/deposit")
     @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
-    public ResponseEntity<TransactionResponse> deposit(@Valid @RequestBody CashTransactionRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(cashService.deposit(request));
+    public ResponseEntity<TransactionResponse> deposit(@Valid @RequestBody CashTransactionRequest request,
+                                                       Authentication auth) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(cashService.deposit(request, parseUserId(auth)));
     }
 
     /** F10: teller withdraws cash from a customer's account. */
     @PostMapping("/transactions/withdrawal")
     @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
-    public ResponseEntity<TransactionResponse> withdrawal(@Valid @RequestBody CashTransactionRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(cashService.withdraw(request));
+    public ResponseEntity<TransactionResponse> withdrawal(@Valid @RequestBody CashTransactionRequest request,
+                                                          Authentication auth) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(cashService.withdraw(request, parseUserId(auth)));
     }
 
     @GetMapping("/transactions/{id}")
@@ -116,5 +123,17 @@ public class TransactionController {
     @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN', 'LOAN_OFFICER')")
     public ResponseEntity<List<ExchangeRateResponse>> getExchangeRates() {
         return ResponseEntity.ok(transactionService.getCurrentExchangeRates());
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    /** Extracts the numeric userId set as principal by HeaderAuthFilter (X-User-Id). */
+    private Long parseUserId(Authentication auth) {
+        if (auth == null || auth.getPrincipal() == null) return null;
+        try {
+            return Long.parseLong(auth.getPrincipal().toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

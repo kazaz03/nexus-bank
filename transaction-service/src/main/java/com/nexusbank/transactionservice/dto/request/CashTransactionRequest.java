@@ -30,6 +30,4 @@ public class CashTransactionRequest {
     @Size(max = 100)
     private String reference;
 
-    /** User id of the teller performing the operation (for audit). */
-    private Long performedBy;
 }

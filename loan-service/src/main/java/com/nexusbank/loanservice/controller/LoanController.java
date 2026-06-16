@@ -96,12 +96,26 @@ public class LoanController {
         return ResponseEntity.ok(loanService.getApplicationsByCustomer(customerId));
     }
 
+    /**
+     * Reviews (approves or rejects) a loan application.
+     * For approvals the disbursement saga is started asynchronously via RabbitMQ;
+     * the response is 202 Accepted to signal that the action has begun but has not
+     * yet completed. A push notification will arrive via SSE when the saga finishes.
+     * Rejections are synchronous and return 200 OK.
+     */
     @PostMapping("/{id}/review")
     @PreAuthorize("hasAnyRole('LOAN_OFFICER', 'ADMIN')")
     public ResponseEntity<LoanApplicationResponse> reviewApplication(
             @PathVariable Long id,
-            @Valid @RequestBody LoanReviewRequest request) {
-        return ResponseEntity.ok(loanService.reviewApplication(id, request));
+            @Valid @RequestBody LoanReviewRequest request,
+            Authentication auth) {
+        Long callerUserId = parseUserId(auth);
+        LoanApplicationResponse result = loanService.reviewApplication(id, request, callerUserId);
+        // 202 for approval (async disbursement in flight), 200 for rejection (synchronous + final)
+        boolean approved = "APPROVED".equals(result.getStatus());
+        return approved
+                ? ResponseEntity.accepted().body(result)
+                : ResponseEntity.ok(result);
     }
 
     @GetMapping("/{id}/schedule")

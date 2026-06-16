@@ -28,7 +28,4 @@ public class LoanReviewRequest {
     private BigDecimal interestRate;
 
     private String rejectionReason;
-
-    @NotNull
-    private Long reviewedBy;
 }
