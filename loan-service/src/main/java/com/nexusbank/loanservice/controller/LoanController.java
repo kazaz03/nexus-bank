@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -30,17 +31,21 @@ public class LoanController {
     @PostMapping
     @PreAuthorize("hasAnyRole('CUSTOMER', 'TELLER', 'ADMIN')")
     public ResponseEntity<LoanApplicationResponse> submitApplication(
-            @Valid @RequestBody LoanApplicationRequest request) {
+            @Valid @RequestBody LoanApplicationRequest request,
+            Authentication auth) {
+        Long callerUserId = parseUserId(auth);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(loanService.submitApplication(request));
+                .body(loanService.submitApplication(request, callerUserId));
     }
 
     @PostMapping("/batch")
     @PreAuthorize("hasAnyRole('TELLER', 'ADMIN')")
     public ResponseEntity<List<LoanApplicationResponse>> submitApplicationsBatch(
-            @Valid @RequestBody List<@Valid LoanApplicationRequest> requests) {
+            @Valid @RequestBody List<@Valid LoanApplicationRequest> requests,
+            Authentication auth) {
+        Long callerUserId = parseUserId(auth);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(loanService.submitApplicationsBatch(requests));
+                .body(loanService.submitApplicationsBatch(requests, callerUserId));
     }
 
     @GetMapping
@@ -67,8 +72,13 @@ public class LoanController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'LOAN_OFFICER', 'TELLER', 'ADMIN')")
-    public ResponseEntity<LoanApplicationResponse> getApplication(@PathVariable Long id) {
-        return ResponseEntity.ok(loanService.getApplication(id));
+    public ResponseEntity<LoanApplicationResponse> getApplication(
+            @PathVariable Long id,
+            Authentication auth) {
+        Long callerUserId = parseUserId(auth);
+        boolean isCustomer = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_CUSTOMER"));
+        return ResponseEntity.ok(loanService.getApplication(id, callerUserId, isCustomer));
     }
 
     @PatchMapping(path = "/{id}", consumes = "application/json-patch+json")
@@ -106,5 +116,23 @@ public class LoanController {
             @RequestParam(required = false) String directBaseUrl,
             @RequestParam Long accountId) {
         return ResponseEntity.ok(loanService.probeAccountServiceInstance(mode, directBaseUrl, accountId));
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Extracts the numeric user ID from the Spring Security {@link Authentication}
+     * whose principal is set to the X-User-Id header value (a String) by
+     * {@code HeaderAuthFilter}.
+     */
+    private Long parseUserId(Authentication auth) {
+        if (auth == null || auth.getPrincipal() == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(auth.getPrincipal().toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

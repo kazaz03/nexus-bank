@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+// Note: Transaction (full rows) are no longer loaded for the 7-day stats window.
+// getStats() now uses the getDailyStats() aggregate query in TransactionRepository.
+
 @Service
 public class TransactionService {
 
@@ -132,13 +135,14 @@ public class TransactionService {
             sums.put(day, BigDecimal.ZERO);
         }
 
-        List<Transaction> recent = transactionRepository.findByCreatedAtBetween(
+        // Single aggregate query — avoids loading every transaction row into memory.
+        List<TransactionRepository.DailyStats> daily = transactionRepository.getDailyStats(
                 windowStart.atStartOfDay(), today.atTime(LocalTime.MAX));
-        for (Transaction tx : recent) {
-            LocalDate day = tx.getCreatedAt().toLocalDate();
+        for (TransactionRepository.DailyStats row : daily) {
+            LocalDate day = row.getDay().toLocalDate();
             if (counts.containsKey(day)) {
-                counts.get(day)[0]++;
-                sums.put(day, sums.get(day).add(tx.getAmount()));
+                counts.get(day)[0] = row.getTxCount() != null ? row.getTxCount() : 0L;
+                sums.put(day, row.getTotalAmount() != null ? row.getTotalAmount() : BigDecimal.ZERO);
             }
         }
 

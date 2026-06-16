@@ -5,8 +5,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
+import java.sql.Date;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -53,5 +57,23 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     long countByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
 
-    List<Transaction> findByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
+    /**
+     * Returns per-day count and total amount for the given window — a single
+     * aggregate SQL query instead of loading every transaction row into memory.
+     * Used by the admin stats dashboard (F17).
+     */
+    @Query(value = "SELECT DATE(t.created_at) AS day, COUNT(*) AS txCount, SUM(t.amount) AS totalAmount " +
+                   "FROM transactions t " +
+                   "WHERE t.created_at BETWEEN :from AND :to " +
+                   "GROUP BY DATE(t.created_at)",
+           nativeQuery = true)
+    List<DailyStats> getDailyStats(@Param("from") LocalDateTime from,
+                                   @Param("to") LocalDateTime to);
+
+    /** Projection for the native daily-aggregate query. */
+    interface DailyStats {
+        Date getDay();
+        Long getTxCount();
+        BigDecimal getTotalAmount();
+    }
 }

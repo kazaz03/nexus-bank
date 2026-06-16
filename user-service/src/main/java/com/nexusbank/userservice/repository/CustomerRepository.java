@@ -21,4 +21,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     @EntityGraph(attributePaths = {"user"})
     Optional<Customer> findByIdCardNumber(String idCardNumber);
+
+    /** Directly resolves userId → Customer without loading the full table. */
+    @EntityGraph(attributePaths = {"user"})
+    Optional<Customer> findByUser_Id(Long userId);
 }

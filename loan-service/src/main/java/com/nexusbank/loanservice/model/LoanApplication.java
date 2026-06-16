@@ -22,6 +22,14 @@ public class LoanApplication {
     @Column(name = "customer_id", nullable = false)
     private Long customerId;
 
+    /**
+     * The users.id of the authenticated user who submitted this application.
+     * Used for ownership verification on CUSTOMER-role fetches. Nullable for
+     * backward compatibility with existing rows (JPA update adds the column).
+     */
+    @Column(name = "user_id")
+    private Long userId;
+
     @Column(name = "account_id", nullable = false)
     private Long accountId;
 
