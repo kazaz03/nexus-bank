@@ -226,3 +226,5 @@ nexus-bank/
 ├── frontend/
 └── compose-rabbitmq.yaml
 ```
+## Demo Video Link
+https://drive.google.com/file/d/1FO4GjNb1ka7rwlcIsIImHwO5Jf74rYXE/view?usp=drive_link 
