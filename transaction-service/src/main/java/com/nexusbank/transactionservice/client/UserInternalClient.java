@@ -40,12 +40,12 @@ public class UserInternalClient {
     public Long resolveUserId(Long customerId) {
         String url = USER_SERVICE + "/api/internal/customers/" + customerId + "/user-id";
         try {
-            Map<String, Long> body = loadBalancedRestTemplate.getForObject(url, Map.class);
-            if (body == null || !body.containsKey("userId")) {
+            Map<String, Object> body = loadBalancedRestTemplate.getForObject(url, Map.class);
+            if (body == null || body.get("userId") == null) {
                 throw new AccountServiceException("Could not resolve userId for customerId=" + customerId,
                         null, false, HttpStatus.UNPROCESSABLE_ENTITY);
             }
-            return body.get("userId");
+            return ((Number) body.get("userId")).longValue();
         } catch (HttpClientErrorException.NotFound e) {
             throw new AccountServiceException("Customer not found: " + customerId,
                     e, false, HttpStatus.UNPROCESSABLE_ENTITY);
